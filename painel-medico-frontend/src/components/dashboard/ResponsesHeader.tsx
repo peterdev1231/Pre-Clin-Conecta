@@ -76,7 +76,7 @@ export default function ResponsesHeader({
   };
 
   return (
-    <div className="z-10 sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-slate-800 dark:to-slate-900 shadow-md p-4 rounded-b-lg mb-6">
+    <div data-testid="responses-header-main-div" className="z-10 sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-slate-800 dark:to-slate-900 shadow-md p-4 rounded-b-lg mb-6">
       <div className="container mx-auto px-0 sm:px-4">
         <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold text-white">
