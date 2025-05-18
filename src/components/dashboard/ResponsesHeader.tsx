@@ -15,6 +15,10 @@ interface ResponsesHeaderProps {
   setSearchTerm: (term: string) => void;
   statusFilter: 'Todos' | 'Lido' | 'Não Lido';
   setStatusFilter: (status: 'Todos' | 'Lido' | 'Não Lido') => void;
+  startDate: Date | null;
+  setStartDate: (date: Date | null) => void;
+  endDate: Date | null;
+  setEndDate: (date: Date | null) => void;
   onRefresh?: () => void;
   onGenerateNewLink?: () => void;
 }
@@ -24,6 +28,10 @@ export default function ResponsesHeader({
   setSearchTerm,
   statusFilter,
   setStatusFilter,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate,
   onRefresh, 
   onGenerateNewLink 
 }: ResponsesHeaderProps) {
@@ -67,6 +75,29 @@ export default function ResponsesHeader({
               <SelectItem value="Lido" className="hover:bg-teal-50 dark:hover:bg-slate-700 focus:bg-teal-100 dark:focus:bg-teal-700/50 cursor-pointer">Lido</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Filtro de Data de Início */}
+          <div className="relative w-full sm:w-auto">
+            <input 
+              type="date"
+              value={startDate ? startDate.toISOString().split('T')[0] : ''}
+              onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
+              aria-label="Data de início"
+              className="w-full sm:w-auto px-3 py-2.5 border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 outline-none transition-all shadow-sm hover:shadow-md placeholder-teal-700/70 dark:placeholder-slate-300/70"
+            />
+          </div>
+
+          {/* Filtro de Data de Fim */}
+          <div className="relative w-full sm:w-auto">
+            <input 
+              type="date"
+              value={endDate ? endDate.toISOString().split('T')[0] : ''}
+              onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
+              min={startDate ? startDate.toISOString().split('T')[0] : undefined}
+              aria-label="Data de fim"
+              className="w-full sm:w-auto px-3 py-2.5 border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 outline-none transition-all shadow-sm hover:shadow-md placeholder-teal-700/70 dark:placeholder-slate-300/70"
+            />
+          </div>
 
           {/* Botão de Atualizar */}
           <button 

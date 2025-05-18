@@ -30,9 +30,11 @@ export default function PatientResponsesView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Lido' | 'Não Lido'>('Todos');
   const [isGenerateLinkModalOpen, setIsGenerateLinkModalOpen] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
 
   const fetchResponses = useCallback(async () => {
-    console.log("[PatientResponsesView] fetchResponses called. User:", user?.id, "SearchTerm:", searchTerm, "StatusFilter:", statusFilter);
+    console.log("[PatientResponsesView] fetchResponses called. User:", user?.id, "SearchTerm:", searchTerm, "StatusFilter:", statusFilter, "StartDate:", startDate, "EndDate:", endDate);
     if (!user) {
       console.log("[PatientResponsesView] No user, aborting fetch.");
       setIsLoading(false);
@@ -83,12 +85,26 @@ export default function PatientResponsesView() {
       console.log("[PatientResponsesView] Step 2 Result - Link IDs for query:", linkIds);
 
       console.log("[PatientResponsesView] Step 3: Fetching respostas_pacientes for link_ids:", linkIds);
-      const { data: respostasData, error: respostasError } = await supabase
+      
+      let query = supabase
         .from('respostas_pacientes')
-        // Seleciona a coluna correta e permite null para data_envio e revisado_pelo_profissional
         .select('id, nome_paciente, data_envio, revisado_pelo_profissional') 
-        .in('link_formulario_id', linkIds)
-        .order('data_envio', { ascending: false, nullsFirst: false }); // Ajustar nullsFirst conforme desejado
+        .in('link_formulario_id', linkIds);
+
+      if (startDate) {
+        const startDateISO = new Date(startDate.setHours(0, 0, 0, 0)).toISOString();
+        console.log("[PatientResponsesView] Applying startDate filter:", startDateISO);
+        query = query.gte('data_envio', startDateISO);
+      }
+      if (endDate) {
+        const endDateISO = new Date(endDate.setHours(23, 59, 59, 999)).toISOString();
+        console.log("[PatientResponsesView] Applying endDate filter:", endDateISO);
+        query = query.lte('data_envio', endDateISO);
+      }
+
+      query = query.order('data_envio', { ascending: false, nullsFirst: false });
+
+      const { data: respostasData, error: respostasError } = await query;
 
       if (respostasError) {
         console.error("[PatientResponsesView] Error fetching respostas_pacientes:", respostasError);
@@ -137,7 +153,7 @@ export default function PatientResponsesView() {
       console.log("[PatientResponsesView] fetchResponses finally block. isLoading should be false.");
       setIsLoading(false);
     }
-  }, [user, searchTerm, supabase, statusFilter]);
+  }, [user, searchTerm, supabase, statusFilter, startDate, endDate]);
 
   useEffect(() => {
     console.log("[PatientResponsesView] useEffect for fetchResponses triggered.");
@@ -156,6 +172,10 @@ export default function PatientResponsesView() {
         setSearchTerm={setSearchTerm}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
+        startDate={startDate}
+        setStartDate={setStartDate}
+        endDate={endDate}
+        setEndDate={setEndDate}
         onRefresh={fetchResponses} 
         onGenerateNewLink={() => {
           console.log("[PatientResponsesView] Generate New Link button clicked.");
