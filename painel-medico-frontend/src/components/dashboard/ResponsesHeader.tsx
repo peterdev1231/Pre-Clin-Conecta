@@ -1,3 +1,5 @@
+console.log("COMPONENTE ResponsesHeader CARREGADO");
+
 'use client';
 
 import React, { useState } from 'react';
