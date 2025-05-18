@@ -115,7 +115,7 @@ export default function ResponsesHeader({
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
               <Button
-                id="date-picker-trigger"
+                id="date-range-picker-trigger"
                 variant={"outline"}
                 className={cn(
                   "w-full sm:w-[260px] justify-start text-left font-normal bg-white/90 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 text-teal-800 dark:text-slate-100 border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 shadow-sm hover:shadow-md",
