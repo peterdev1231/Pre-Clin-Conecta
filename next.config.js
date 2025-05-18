@@ -1,6 +1,6 @@
-import type { NextConfig } from "next";
+// import type { NextConfig } from "next"; // Comentado ou removido
 
-const nextConfig: NextConfig = {
+const nextConfig = { // Removida a tipagem : NextConfig
   images: {
     remotePatterns: [
       {
@@ -14,4 +14,4 @@ const nextConfig: NextConfig = {
   /* config options here */
 };
 
-export default nextConfig;
+export default nextConfig; // Mantido como export default, Next.js 14 deve lidar bem. 
