@@ -8,6 +8,7 @@ import Step4Alergias from './Step4Alergias';
 import Step5UploadFotos from './Step5UploadFotos';
 import Step6UploadExames from './Step6UploadExames';
 import Step7Review from './Step7Review';
+import { v4 as uuidv4 } from 'uuid';
 
 interface PatientFormStepperProps {
   linkId: string;
@@ -22,6 +23,16 @@ interface FormData {
   naoPossuiAlergias?: boolean;
 }
 
+interface FileUploadState {
+  id: string;
+  file: File;
+  status: 'pending' | 'getting_url' | 'uploading' | 'processing_metadata' | 'completed' | 'error';
+  progress: number;
+  error?: string;
+  pathStorage?: string;
+  tipoDocumento: 'foto' | 'exame';
+}
+
 const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormSubmitSuccess }) => {
   const supabase = createClient();
   const [currentStep, setCurrentStep] = useState(1);
@@ -32,13 +43,10 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
     alergiasConhecidas: '',
     naoPossuiAlergias: false,
   });
-  const [fotosSelecionadas, setFotosSelecionadas] = useState<File[]>([]);
-  const [examesSelecionados, setExamesSelecionados] = useState<File[]>([]);
+  const [submissionAttemptId, setSubmissionAttemptId] = useState<string | null>(null);
+  const [fileUploads, setFileUploads] = useState<Record<string, FileUploadState>>({});
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [filesUploaded, setFilesUploaded] = useState(0);
-  const [totalFilesToUpload, setTotalFilesToUpload] = useState(0);
 
   const totalSteps = 7;
 
@@ -90,102 +98,35 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
     }
   };
 
-  const uploadFile = async (file: File, respostaId: string, tipoDocumento: 'foto' | 'exame') => {
-    console.log(`[UPLOAD_LOGS] START - Tipo: ${tipoDocumento}, Arquivo: ${file.name}, Tamanho: ${file.size}, MimeType: ${file.type}, LastModified: ${file.lastModified}`);
-    try {
-      console.log('[UPLOAD_LOGS] File Object (JSON.stringify attempt):', JSON.stringify(file));
-    } catch (e: any) {
-      console.warn('[UPLOAD_LOGS] Could not stringify complete File object:', e.message);
+  const handleFileUploadStart = (file: File, tipoDocumento: 'foto' | 'exame') => {
+    if (!submissionAttemptId) {
+      console.error("submissionAttemptId ainda não está definido. Upload não pode iniciar.");
+      return; 
     }
-
-    try {
-      console.log(`[UPLOAD_LOGS ${tipoDocumento}] Requesting signed URL for: ${file.name}`);
-      const { data: signedUrlData, error: signedUrlError } = await supabase.functions.invoke('gerar-url-upload', {
-        body: {
-          fileName: file.name,
-          respostaPacienteId: respostaId,
-          tipoDocumento: tipoDocumento,
-        },
-      });
-
-      if (signedUrlError) {
-        console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to get signed URL for ${file.name}:`, signedUrlError.message, signedUrlError);
-        setUploadError(prev => `${prev || ''}Falha ao obter URL para ${file.name}: ${signedUrlError.message}. `);
-        setFilesUploaded(prev => prev + 1);
-        return;
+    const localFileId = `${file.name}-${file.lastModified}-${uuidv4()}`;
+    setFileUploads(prev => ({
+      ...prev,
+      [localFileId]: {
+        id: localFileId,
+        file,
+        status: 'pending',
+        progress: 0,
+        tipoDocumento,
       }
+    }));
+  };
 
-      if (!signedUrlData || !signedUrlData.signedUrl || !signedUrlData.path) {
-        console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Invalid signed URL data for ${file.name}:`, signedUrlData);
-        setUploadError(prev => `${prev || ''}Dados de URL inválidos para ${file.name}. `);
-        setFilesUploaded(prev => prev + 1);
-        return;
+  const updateFileUploadState = (localFileId: string, newState: Partial<FileUploadState>) => {
+    setFileUploads(prev => {
+      if (!prev[localFileId]) {
+        console.warn(`[Stepper] Tentativa de atualizar estado para ID de arquivo desconhecido: ${localFileId}`);
+        return prev;
       }
-
-      const { signedUrl, path: pathStorage } = signedUrlData;
-      console.log(`[UPLOAD_LOGS ${tipoDocumento}] Got signed URL for ${file.name}. URL: ${signedUrl}, Uploading to path: ${pathStorage}`);
-
-      const response = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
-        body: file,
-      });
-
-      if (!response.ok) {
-        let errorBodyText = 'Could not read error body';
-        try {
-            errorBodyText = await response.text();
-        } catch (e: any) {
-            console.warn(`[UPLOAD_LOGS ${tipoDocumento}] WARN - Could not read text from error response for ${file.name}: ${e.message}`);
-        }
-        console.error(`[UPLOAD_LOGS ${tipoDocumento}] FAILED - Direct upload to Storage failed for ${file.name} (Status: ${response.status}, StatusText: ${response.statusText}). Body:`, errorBodyText);
-        setUploadError(prev => `${prev || ''}Upload direto falhou para ${file.name} (Status: ${response.status}). Detalhe: ${errorBodyText}. `);
-      } else {
-        console.log(`[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully uploaded ${file.name} directly to Storage. Path: ${pathStorage}`);
-
-        console.log(`[UPLOAD_LOGS ${tipoDocumento}] Registering metadata for ${file.name}, path: ${pathStorage}`);
-        const { error: metaError } = await supabase.functions.invoke('upload-arquivo-paciente', {
-          body: {
-            resposta_paciente_id: respostaId,
-            nome_arquivo_original: file.name,
-            path_storage: pathStorage,
-            tipo_mime: file.type || 'application/octet-stream',
-            tipo_documento: tipoDocumento,
-            tamanho_arquivo_bytes: file.size,
-          },
-        });
-
-        if (metaError) {
-          console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to register metadata for ${file.name}:`, metaError.message, metaError);
-          setUploadError(prev => `${prev || ''}Falha ao registrar metadados para ${file.name}: ${metaError.message}. `);
-        } else {
-          console.log(`[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully registered metadata for ${file.name}`);
-        }
-      }
-
-    } catch (err: any) {
-      let detailedErrorMessage = err.message;
-      console.error(
-        `[UPLOAD_LOGS ${tipoDocumento}] EXCEPTION - Upload process for ${file.name}: `,
-        'Message:', err.message, 
-        'Name:', err.name, 
-        'Stack:', err.stack,
-        err.cause ? 'Cause:' : '', err.cause ? JSON.stringify(err.cause, Object.getOwnPropertyNames(err.cause)) : ''
-      );
-      if (err.cause) {
-        try {
-          const causeDetails = JSON.stringify(err.cause, Object.getOwnPropertyNames(err.cause));
-          detailedErrorMessage += ` Causa: ${causeDetails}`;
-        } catch (stringifyError: any) { 
-          detailedErrorMessage += ` Causa: (não foi possível serializar causa - ${stringifyError.message})`;
-        }
-      }
-      setUploadError(prev => `${prev || ''}Exceção no upload de ${file.name}: ${detailedErrorMessage}. `);
-    } finally {
-      setFilesUploaded(prev => prev + 1);
-    }
+      return {
+        ...prev,
+        [localFileId]: { ...prev[localFileId], ...newState },
+      };
+    });
   };
 
   const handleSubmit = async () => {
@@ -201,18 +142,29 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
       setCurrentStep(2);
       return;
     }
+    
+    const uploadsEmAndamento = Object.values(fileUploads).some(f => 
+      f.status === 'uploading' || 
+      f.status === 'getting_url' || 
+      f.status === 'pending' || 
+      f.status === 'processing_metadata'
+    );
+    if (uploadsEmAndamento) {
+        setError("Aguarde a conclusão de todos os uploads de arquivos antes de enviar o formulário.");
+        return;
+    }
 
     setIsSubmitting(true);
     setError(null);
-    setUploadError(null);
-    setFilesUploaded(0);
-    setTotalFilesToUpload(fotosSelecionadas.length + examesSelecionados.length);
-
-    let submissionId: string | null = null;
 
     try {
+      if (!submissionAttemptId) {
+        throw new Error("ID da tentativa de submissão não encontrado.");
+      }
+
       const payload = {
         linkId: linkId,
+        submissionAttemptId: submissionAttemptId, 
         nomePaciente: formData.nomePaciente,
         queixaPrincipal: formData.queixaPrincipal,
         medicacoesEmUso: formData.medicacoesEmUso || '',
@@ -226,15 +178,12 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
       });
 
       if (submissionError) {
-        console.error('Erro ao submeter dados do formulário:', submissionError);
         let displayError = 'Ocorreu um erro ao submeter o formulário. Tente novamente.';
         if (submissionError.message.includes('Function returned an error')) {
           try {
             const errorResponse = JSON.parse(submissionError.message.substring(submissionError.message.indexOf('{')));
             displayError = errorResponse.error || displayError;
-          } catch /* (e) */ {
-            // Mantém o erro genérico se o parse falhar
-          }
+          } catch {}
         } else if (submissionError.message.includes('NetworkError')) {
             displayError = 'Erro de rede. Verifique sua conexão e tente novamente.';
         }
@@ -244,48 +193,26 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
       }
 
       if (data && data.respostaId) {
-        submissionId = data.respostaId;
-        
-        if (submissionId && (fotosSelecionadas.length > 0 || examesSelecionados.length > 0)) {
-          setFilesUploaded(0);
-          setTotalFilesToUpload(fotosSelecionadas.length + examesSelecionados.length);
-
-          const uploadPromises: Promise<void>[] = [];
-
-          fotosSelecionadas.forEach(file => {
-            uploadPromises.push(uploadFile(file, submissionId!, 'foto'));
-          });
-          examesSelecionados.forEach(file => {
-            uploadPromises.push(uploadFile(file, submissionId!, 'exame'));
-          });
-
-          await Promise.all(uploadPromises);
-        }
-        
-        if (submissionId) {
-          onFormSubmitSuccess(submissionId);
-        } else {
-          setError('Falha ao obter o ID da submissão para finalizar.');
-          setIsSubmitting(false);
-        }
-
+        onFormSubmitSuccess(data.respostaId);
       } else {
         setError('Resposta inesperada do servidor ao submeter dados.');
         setIsSubmitting(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro inesperado durante a submissão:', err);
-      setError('Ocorreu um erro inesperado. Por favor, contate o suporte.');
+      setError(err.message || 'Ocorreu um erro inesperado. Por favor, contate o suporte.');
       setIsSubmitting(false);
     }
   };
 
   useEffect(() => {
-    if (!isSubmitting && filesUploaded === 0) {
-      setError(null);
-      setUploadError(null);
+    if (linkId && !submissionAttemptId) {
+      setSubmissionAttemptId(uuidv4());
     }
-  }, [currentStep, isSubmitting, filesUploaded]);
+  }, [linkId, submissionAttemptId]);
+
+  const fotosParaRevisao = Object.values(fileUploads).filter(f => f.tipoDocumento === 'foto');
+  const examesParaRevisao = Object.values(fileUploads).filter(f => f.tipoDocumento === 'exame');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-700 to-emerald-900 flex flex-col items-center justify-center p-4 selection:bg-emerald-400 selection:text-white">
@@ -342,15 +269,6 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
             <p>{error}</p>
           </div>
         )}
-        {uploadError && (
-          <div className="mb-6 p-4 bg-orange-50 border border-orange-200 text-orange-700 rounded-md flex items-center">
-            <UploadCloud className="w-5 h-5 mr-3 flex-shrink-0" />
-            <div>
-                <p className="font-semibold">Erro no upload de arquivos:</p>
-                <p className="text-sm">{uploadError}</p>
-            </div>
-          </div>
-        )}
 
         {isSubmitting && <p>Carregando formulário...</p>}
         {!isSubmitting && !error && (
@@ -359,9 +277,28 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
             {currentStep === 2 && <Step2Queixa formData={formData} onChange={handleChange('queixaPrincipal')} />}
             {currentStep === 3 && <Step3Medicacoes formData={formData} onChange={handleChange('medicacoesEmUso')} />}
             {currentStep === 4 && <Step4Alergias formData={formData} onChange={handleChange} />}
-            {currentStep === 5 && <Step5UploadFotos setFotosNoStepper={setFotosSelecionadas} initialFiles={fotosSelecionadas} />}
-            {currentStep === 6 && <Step6UploadExames setExamesNoStepper={setExamesSelecionados} initialFiles={examesSelecionados} />}
-            {currentStep === 7 && <Step7Review formData={formData} fotos={fotosSelecionadas} exames={examesSelecionados} onEditStep={handleEditStep} />}
+            {currentStep === 5 && submissionAttemptId && (
+              <Step5UploadFotos 
+                submissionAttemptId={submissionAttemptId}
+                updateFileStateInStepper={updateFileUploadState}
+                initialFiles={Object.values(fileUploads).filter(f => f.tipoDocumento === 'foto')}
+              />
+            )}
+            {currentStep === 6 && submissionAttemptId && (
+              <Step6UploadExames
+                submissionAttemptId={submissionAttemptId}
+                updateFileStateInStepper={updateFileUploadState}
+                initialFiles={Object.values(fileUploads).filter(f => f.tipoDocumento === 'exame')}
+              />
+            )}
+            {currentStep === 7 && (
+              <Step7Review 
+                formData={formData} 
+                fotos={fotosParaRevisao}
+                exames={examesParaRevisao}
+                onEditStep={handleEditStep} 
+              />
+            )}
           </div>
         )}
 
@@ -386,24 +323,62 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting || filesUploaded > 0}
+              disabled={isSubmitting || Object.values(fileUploads).some(f => f.status === 'uploading' || f.status === 'pending' || f.status === 'getting_url')}
               className="px-8 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:bg-emerald-300 flex items-center shadow-md hover:shadow-lg"
             >
-              {isSubmitting || filesUploaded > 0 ? (
+              {isSubmitting || Object.values(fileUploads).some(f => f.status === 'pending' || f.status === 'uploading') ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  {filesUploaded > 0 ? `Enviando arquivos (${filesUploaded}/${totalFilesToUpload})...` : 'Enviando formulário...'}
+                  {Object.values(fileUploads).some(f => f.status === 'pending' || f.status === 'uploading') ? `Enviando arquivos...` : 'Enviando formulário...'}
                 </>
               ) : (
                 <CheckCircle className="w-5 h-5 mr-2" />
               )}
-              {isSubmitting || filesUploaded > 0 ? '' : 'Confirmar e Enviar'}
+              {isSubmitting || Object.values(fileUploads).some(f => f.status === 'pending' || f.status === 'uploading') ? '' : 'Confirmar e Enviar'}
             </button>
           )}
         </div>
+
+        {Object.keys(fileUploads).length > 0 && (
+          <div className="my-6 p-4 bg-gray-50 border border-gray-200 rounded-md">
+            <h3 className="text-lg font-semibold text-gray-700 mb-3">Progresso dos Uploads:</h3>
+            <ul className="space-y-3">
+              {Object.values(fileUploads).map(upState => (
+                <li key={upState.id} className="p-3 bg-white rounded-lg shadow border border-gray-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-600 truncate w-3/5">{upState.file.name} ({upState.tipoDocumento})</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      upState.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                      upState.status === 'error' ? 'bg-red-100 text-red-700' :
+                      upState.status === 'uploading' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-600' // Default para pending, etc.
+                    }`}>
+                      {upState.status === 'uploading' ? `Enviando ${upState.progress}%` : 
+                       upState.status === 'completed' ? 'Concluído' : 
+                       upState.status === 'error' ? 'Erro' : 
+                       upState.status === 'pending' ? 'Pendente' :
+                       upState.status === 'getting_url' ? 'Obtendo URL' :
+                       upState.status === 'processing_metadata' ? 'Processando' :
+                       upState.status // Fallback para outros status, caso existam
+                      }
+                    </span>
+                  </div>
+                  {upState.status === 'uploading' && (
+                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                      <div className="bg-emerald-500 h-2 rounded-full transition-all duration-150" style={{ width: `${upState.progress}%` }}></div>
+                    </div>
+                  )}
+                  {upState.status === 'error' && upState.error && (
+                    <p className="text-xs text-red-600 mt-1">{upState.error}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

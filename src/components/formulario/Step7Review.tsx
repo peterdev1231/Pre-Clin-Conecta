@@ -1,109 +1,159 @@
 import React from 'react';
-import { File as FileIcon, Edit3 } from 'lucide-react';
+import { ListChecks, User, HeartPulse, Pill, ShieldAlert, ImageIcon, FileText, Edit3, CheckCircle, AlertCircle } from 'lucide-react';
+
+// Importar ou definir FileUploadState, se não for importado de um local compartilhado
+interface FileUploadState {
+  id: string;
+  file: File;
+  status: 'pending' | 'getting_url' | 'uploading' | 'processing_metadata' | 'completed' | 'error';
+  progress: number;
+  error?: string;
+  pathStorage?: string;
+  tipoDocumento: 'foto' | 'exame';
+}
 
 interface Step7ReviewProps {
   formData: {
     nomePaciente: string;
     queixaPrincipal: string;
-    medicacoesEmUso: string;
-    alergiasConhecidas: string;
+    medicacoesEmUso?: string;
+    alergiasConhecidas?: string;
     naoPossuiAlergias?: boolean;
   };
-  fotos: File[];
-  exames: File[];
+  fotos: FileUploadState[]; // ATUALIZADO
+  exames: FileUploadState[]; // ATUALIZADO
   onEditStep: (step: number) => void;
 }
 
-const ReviewItem: React.FC<{label: string, value: string, step: number, onEditStep: (step: number) => void}> = ({label, value, step, onEditStep}) => (
-  <div className="p-4 border border-gray-200 rounded-lg shadow-sm bg-emerald-50 hover:shadow-md transition-shadow">
-    <div className="flex justify-between items-center">
-      <div>
-        <p className="text-sm font-medium text-emerald-700">{label}</p>
-        <p className="text-lg text-gray-800 whitespace-pre-wrap break-words">{value || 'Não informado'}</p>
-      </div>
-      <button
-        onClick={() => onEditStep(step)}
-        className="text-sm text-emerald-600 hover:text-emerald-800 transition-colors p-2 rounded-md hover:bg-emerald-100 flex items-center"
-      >
-        <Edit3 size={16} className="mr-1" /> Editar
-      </button>
-    </div>
-  </div>
-);
-
-const FileListItem: React.FC<{file: File}> = ({file}) => (
-  <li className="flex items-center space-x-2 py-1">
-    <FileIcon className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-    <span className="text-gray-700 truncate">{file.name}</span>
-    <span className="text-gray-500 text-xs">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-  </li>
-);
-
 const Step7Review: React.FC<Step7ReviewProps> = ({ formData, fotos, exames, onEditStep }) => {
-  const displayAlergias = formData.naoPossuiAlergias 
-    ? 'Paciente informou não possuir alergias conhecidas' 
-    : formData.alergiasConhecidas || 'Não informado';
+  const { nomePaciente, queixaPrincipal, medicacoesEmUso, alergiasConhecidas, naoPossuiAlergias } = formData;
+
+  const renderFileList = (files: FileUploadState[], fileType: string) => {
+    if (!files || files.length === 0) {
+      return <p className="text-gray-500 italic">Nenhum arquivo de {fileType} enviado.</p>;
+    }
+    return (
+      <ul className="list-disc list-inside space-y-1 pl-1">
+        {files.map((uploadState) => (
+          <li key={uploadState.id} className="text-gray-700 flex items-center">
+            {uploadState.status === 'completed' && <CheckCircle className="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" />}
+            {uploadState.status === 'error' && <AlertCircle className="w-4 h-4 text-red-500 mr-2 flex-shrink-0" />}
+            {uploadState.status !== 'completed' && uploadState.status !== 'error' && <ListChecks className="w-4 h-4 text-blue-500 mr-2 flex-shrink-0" />} {/* Em andamento/Pendente */}
+            <span className="truncate">{uploadState.file.name}</span>
+            {uploadState.status === 'error' && <span className="text-xs text-red-500 ml-2">(Falha no upload)</span>}
+            {uploadState.status !== 'completed' && uploadState.status !== 'error' && <span className="text-xs text-blue-500 ml-2">({uploadState.status === 'uploading' ? `Enviando ${uploadState.progress}%` : 'Processando...'})</span>}
+          </li>
+        ))}
+      </ul>
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-3xl font-semibold text-gray-800 mb-6 text-center">
-        Revise suas Informações
-      </h2>
+    <div className="space-y-8">
+      <div className="flex flex-col items-center text-center">
+        <ListChecks className="w-16 h-16 text-emerald-600 mb-4" />
+        <h2 className="text-3xl font-semibold text-gray-800">Revise suas Informações</h2>
+        <p className="text-gray-600 mt-2">Por favor, verifique todos os dados antes de confirmar o envio.</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ReviewItem label="Nome do Paciente" value={formData.nomePaciente} step={1} onEditStep={onEditStep} />
-        <ReviewItem label="Queixa Principal" value={formData.queixaPrincipal} step={2} onEditStep={onEditStep} />
-        <ReviewItem label="Medicações em Uso" value={formData.medicacoesEmUso} step={3} onEditStep={onEditStep} />
-        <ReviewItem label="Alergias Conhecidas" value={displayAlergias} step={4} onEditStep={onEditStep} />
-        
-        {/* Fotos (Opcional) */}
-        <div className="p-4 border border-gray-200 rounded-lg shadow-sm bg-emerald-50 hover:shadow-md transition-shadow md:col-span-1">
+      {/* Resumo dos Dados */}
+      <div className="space-y-6">
+        {/* Nome do Paciente */}
+        <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
           <div className="flex justify-between items-center mb-2">
-            <p className="text-sm font-medium text-emerald-700">Fotos Enviadas (Opcional)</p>
-            <button
-              onClick={() => onEditStep(5)}
-              className="text-sm text-emerald-600 hover:text-emerald-800 transition-colors p-2 rounded-md hover:bg-emerald-100 flex items-center"
-            >
-              <Edit3 size={16} className="mr-1" /> Editar
+            <div className="flex items-center">
+              <User className="w-6 h-6 text-emerald-600 mr-3" />
+              <h3 className="text-xl font-semibold text-gray-700">Nome do Paciente</h3>
+            </div>
+            <button onClick={() => onEditStep(1)} className="text-sm text-emerald-600 hover:text-emerald-800 flex items-center">
+              <Edit3 className="w-4 h-4 mr-1" /> Editar
             </button>
           </div>
-          {fotos && fotos.length > 0 ? (
-            <ul className="space-y-1 mt-1">
-              {fotos.map((file, index) => (
-                <FileListItem key={`foto-${index}`} file={file} />
-              ))}
-            </ul>
-          ) : (
-            <p className="text-md text-gray-600">Nenhuma foto será enviada.</p>
-          )}
+          <p className="text-gray-700 pl-9">{nomePaciente || <span className="italic text-gray-400">Não informado</span>}</p>
         </div>
 
-        {/* Exames (Opcional) */}
-        <div className="p-4 border border-gray-200 rounded-lg shadow-sm bg-emerald-50 hover:shadow-md transition-shadow md:col-span-1">
+        {/* Queixa Principal */}
+        <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
           <div className="flex justify-between items-center mb-2">
-            <p className="text-sm font-medium text-emerald-700">Exames Enviados (Opcional)</p>
-            <button
-              onClick={() => onEditStep(6)}
-              className="text-sm text-emerald-600 hover:text-emerald-800 transition-colors p-2 rounded-md hover:bg-emerald-100 flex items-center"
-            >
-              <Edit3 size={16} className="mr-1" /> Editar
+            <div className="flex items-center">
+              <HeartPulse className="w-6 h-6 text-emerald-600 mr-3" />
+              <h3 className="text-xl font-semibold text-gray-700">Queixa Principal</h3>
+            </div>
+            <button onClick={() => onEditStep(2)} className="text-sm text-emerald-600 hover:text-emerald-800 flex items-center">
+              <Edit3 className="w-4 h-4 mr-1" /> Editar
             </button>
           </div>
-          {exames && exames.length > 0 ? (
-            <ul className="space-y-1 mt-1">
-              {exames.map((file, index) => (
-                <FileListItem key={`exame-${index}`} file={file} />
-              ))}
-            </ul>
-          ) : (
-            <p className="text-md text-gray-600">Nenhum exame será enviado.</p>
-          )}
+          <p className="text-gray-700 pl-9 whitespace-pre-wrap">{queixaPrincipal || <span className="italic text-gray-400">Não informado</span>}</p>
+        </div>
+
+        {/* Medicações em Uso */}
+        <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center">
+              <Pill className="w-6 h-6 text-emerald-600 mr-3" />
+              <h3 className="text-xl font-semibold text-gray-700">Medicações em Uso</h3>
+            </div>
+            <button onClick={() => onEditStep(3)} className="text-sm text-emerald-600 hover:text-emerald-800 flex items-center">
+              <Edit3 className="w-4 h-4 mr-1" /> Editar
+            </button>
+          </div>
+          <p className="text-gray-700 pl-9 whitespace-pre-wrap">{medicacoesEmUso || <span className="italic text-gray-400">Não informado</span>}</p>
+        </div>
+
+        {/* Alergias Conhecidas */}
+        <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center">
+              <ShieldAlert className="w-6 h-6 text-emerald-600 mr-3" />
+              <h3 className="text-xl font-semibold text-gray-700">Alergias Conhecidas</h3>
+            </div>
+            <button onClick={() => onEditStep(4)} className="text-sm text-emerald-600 hover:text-emerald-800 flex items-center">
+              <Edit3 className="w-4 h-4 mr-1" /> Editar
+            </button>
+          </div>
+          <p className="text-gray-700 pl-9 whitespace-pre-wrap">
+            {naoPossuiAlergias ? "Paciente informou não possuir alergias conhecidas." : (alergiasConhecidas || <span className="italic text-gray-400">Não informado</span>)}
+          </p>
+        </div>
+
+        {/* Fotos */}
+        <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center">
+              <ImageIcon className="w-6 h-6 text-emerald-600 mr-3" />
+              <h3 className="text-xl font-semibold text-gray-700">Fotos Enviadas</h3>
+            </div>
+            <button onClick={() => onEditStep(5)} className="text-sm text-emerald-600 hover:text-emerald-800 flex items-center">
+              <Edit3 className="w-4 h-4 mr-1" /> Editar
+            </button>
+          </div>
+          <div className="pl-9">
+            {renderFileList(fotos, "fotos")}
+          </div>
+        </div>
+
+        {/* Exames */}
+        <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center">
+              <FileText className="w-6 h-6 text-emerald-600 mr-3" />
+              <h3 className="text-xl font-semibold text-gray-700">Exames Enviados</h3>
+            </div>
+            <button onClick={() => onEditStep(6)} className="text-sm text-emerald-600 hover:text-emerald-800 flex items-center">
+              <Edit3 className="w-4 h-4 mr-1" /> Editar
+            </button>
+          </div>
+          <div className="pl-9">
+            {renderFileList(exames, "exames")}
+          </div>
         </div>
       </div>
 
-      <p className="mt-8 text-sm text-gray-600 text-center bg-yellow-50 border border-yellow-200 p-3 rounded-md">
-        Por favor, revise todas as informações cuidadosamente. Após o envio, não será possível editar.
-      </p>
+      <div className="mt-10 text-center">
+        <p className="text-sm text-gray-500">
+          Ao confirmar, seus dados serão enviados de forma segura para o profissional de saúde.
+        </p>
+      </div>
     </div>
   );
 };
