@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Search, RefreshCw, PlusCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, RefreshCw, PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -9,6 +9,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface ResponsesHeaderProps {
   searchTerm: string;
@@ -23,6 +33,28 @@ interface ResponsesHeaderProps {
   onGenerateNewLink?: () => void;
 }
 
+const datePresets = [
+  { label: "Hoje", getValue: () => ({ from: new Date(), to: new Date() }) },
+  { label: "Ontem", getValue: () => ({ from: addDays(new Date(), -1), to: addDays(new Date(), -1) }) },
+  { label: "Últimos 7 dias", getValue: () => ({ from: addDays(new Date(), -6), to: new Date() }) },
+  { label: "Últimos 30 dias", getValue: () => ({ from: addDays(new Date(), -29), to: new Date() }) },
+  { label: "Esta semana", getValue: () => ({ from: startOfWeek(new Date(), { locale: ptBR }), to: endOfWeek(new Date(), { locale: ptBR }) }) },
+  { label: "Semana passada", getValue: () => {
+      const today = new Date();
+      const prevWeekStart = startOfWeek(addDays(today, -7), { locale: ptBR });
+      const prevWeekEnd = endOfWeek(addDays(today, -7), { locale: ptBR });
+      return { from: prevWeekStart, to: prevWeekEnd };
+    }
+  },
+  { label: "Este mês", getValue: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
+  { label: "Mês passado", getValue: () => {
+      const today = new Date();
+      const prevMonth = subMonths(today, 1);
+      return { from: startOfMonth(prevMonth), to: endOfMonth(prevMonth) };
+    }
+  },
+];
+
 export default function ResponsesHeader({ 
   searchTerm,
   setSearchTerm,
@@ -35,6 +67,29 @@ export default function ResponsesHeader({
   onRefresh, 
   onGenerateNewLink 
 }: ResponsesHeaderProps) {
+  const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+
+  const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
+    if (range?.from) setStartDate(range.from);
+    else setStartDate(null);
+    
+    if (range?.to) setEndDate(range.to);
+    else if (range?.from) setEndDate(range.from);
+    else setEndDate(null);
+  };
+
+  const handlePresetSelect = (preset: typeof datePresets[0]) => {
+    const { from, to } = preset.getValue();
+    setStartDate(from);
+    setEndDate(to);
+    setIsDatePopoverOpen(false);
+  };
+
+  const clearDates = () => {
+    setStartDate(null);
+    setEndDate(null);
+  };
+
   return (
     <div className="mb-6 md:mb-8 p-6 md:p-8 bg-teal-600 dark:bg-teal-700 rounded-xl shadow-lg">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
@@ -49,9 +104,9 @@ export default function ResponsesHeader({
         </div>
 
         {/* Ações Globais */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end space-y-3 sm:space-y-0 sm:space-x-3 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 flex-wrap flex-shrink-0">
           {/* Barra de Busca */}
-          <div className="relative w-full sm:w-auto">
+          <div className="relative w-full sm:w-auto grow sm:grow-0">
             <input 
               type="text"
               value={searchTerm}
@@ -76,46 +131,88 @@ export default function ResponsesHeader({
             </SelectContent>
           </Select>
 
-          {/* Filtro de Data de Início */}
-          <div className="relative w-full sm:w-auto">
-            <input 
-              type="date"
-              value={startDate ? startDate.toISOString().split('T')[0] : ''}
-              onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
-              aria-label="Data de início"
-              className="w-full sm:w-auto px-3 py-2.5 border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 outline-none transition-all shadow-sm hover:shadow-md placeholder-teal-700/70 dark:placeholder-slate-300/70"
-            />
-          </div>
-
-          {/* Filtro de Data de Fim */}
-          <div className="relative w-full sm:w-auto">
-            <input 
-              type="date"
-              value={endDate ? endDate.toISOString().split('T')[0] : ''}
-              onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
-              min={startDate ? startDate.toISOString().split('T')[0] : undefined}
-              aria-label="Data de fim"
-              className="w-full sm:w-auto px-3 py-2.5 border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 outline-none transition-all shadow-sm hover:shadow-md placeholder-teal-700/70 dark:placeholder-slate-300/70"
-            />
-          </div>
+          {/* Date Range Picker */}
+          <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn(
+                  "w-full sm:w-[260px] justify-start text-left font-normal bg-white/90 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 text-teal-800 dark:text-slate-100 border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 shadow-sm hover:shadow-md",
+                  !startDate && "text-teal-700/70 dark:text-slate-300/70"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {startDate && endDate ? (
+                  <>
+                    {format(startDate, "dd/MM/yy", { locale: ptBR })} - {format(endDate, "dd/MM/yy", { locale: ptBR })}
+                  </>
+                ) : startDate ? (
+                  format(startDate, "dd/MM/yy", { locale: ptBR })
+                ) : (
+                  <span>Selecione o período</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 flex flex-col sm:flex-row bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-xl rounded-md" align="end">
+              <div className="flex flex-col p-3 space-y-1 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-slate-700">
+                {datePresets.map((preset) => (
+                  <Button
+                    key={preset.label}
+                    variant="ghost"
+                    className="w-full justify-start text-sm h-auto py-1.5 px-2 text-slate-700 dark:text-slate-200 hover:bg-teal-50 dark:hover:bg-slate-800"
+                    onClick={() => handlePresetSelect(preset)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start text-sm h-auto py-1.5 px-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50"
+                        onClick={clearDates}
+                    >
+                        Limpar
+                    </Button>
+                </div>
+              </div>
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={startDate || new Date()}
+                selected={{ from: startDate!, to: endDate || undefined }}
+                onSelect={(range) => handleDateRangeSelect(range as { from?: Date; to?: Date })}
+                numberOfMonths={1}
+                locale={ptBR}
+                className="p-3"
+                classNames={{
+                  day_selected: "bg-teal-600 text-white hover:bg-teal-600 hover:text-white focus:bg-teal-600 focus:text-white dark:bg-teal-500 dark:hover:bg-teal-500",
+                  day_today: "bg-teal-100 text-teal-700 dark:bg-teal-800 dark:text-teal-200",
+                }}
+              />
+            </PopoverContent>
+          </Popover>
 
           {/* Botão de Atualizar */}
-          <button 
+          <Button 
             onClick={onRefresh}
             title="Atualizar dados"
-            className="p-2.5 border border-transparent rounded-lg bg-white/20 hover:bg-white/30 text-white focus:ring-2 focus:ring-white focus:outline-none transition-all shadow-sm hover:shadow-md flex items-center justify-center"
+            variant="outline"
+            size="icon"
+            className="p-2.5 bg-white/20 hover:bg-white/30 text-white border-transparent focus:ring-2 focus:ring-white"
           >
             <RefreshCw className="w-5 h-5" />
-          </button>
+          </Button>
 
           {/* Botão de Gerar Novo Link */}
-          <button 
+          <Button 
             onClick={onGenerateNewLink}
-            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 py-2.5 bg-white text-teal-700 font-semibold rounded-lg shadow-md hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-300 focus:ring-offset-2 focus:ring-offset-teal-600 dark:focus:ring-offset-teal-700 transition-colors duration-150"
+            variant="default"
+            className="w-full sm:w-auto bg-white text-teal-700 hover:bg-teal-50 focus:ring-offset-teal-600 dark:focus:ring-offset-teal-700"
           >
-            <PlusCircle className="w-5 h-5" />
+            <PlusCircle className="mr-2 w-5 h-5" />
             <span>Gerar Novo Link</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>
