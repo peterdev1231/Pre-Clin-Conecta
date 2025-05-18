@@ -1,6 +1,6 @@
-console.log("COMPONENTE ResponsesHeader CARREGADO");
-
 'use client';
+
+console.log("COMPONENTE ResponsesHeader CARREGADO");
 
 import React, { useState } from 'react';
 import { Search, RefreshCw, PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
