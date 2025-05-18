@@ -39,8 +39,33 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [filesUploaded, setFilesUploaded] = useState(0);
   const [totalFilesToUpload, setTotalFilesToUpload] = useState(0);
+  const [debugMessages, setDebugMessages] = useState<string[]>([]);
 
   const totalSteps = 7;
+
+  const logToScreen = (level: 'log' | 'warn' | 'error', ...args: any[]) => {
+    const messageParts: string[] = [];
+    args.forEach(arg => {
+      if (typeof arg === 'object') {
+        try {
+          messageParts.push(JSON.stringify(arg, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+          , 2));
+        } catch (e: any) {
+          messageParts.push(`[Não serializável: ${e.message}]`);
+        }
+      } else {
+        messageParts.push(String(arg));
+      }
+    });
+    const fullMessage = `[${level.toUpperCase()}] ${new Date().toISOString()} - ${messageParts.join(' ')}`;
+    
+    setDebugMessages(prev => [...prev.slice(-100), fullMessage]);
+
+    if (level === 'log') console.log(...args);
+    else if (level === 'warn') console.warn(...args);
+    else if (level === 'error') console.error(...args);
+  };
 
   const steps = [
     { title: 'Nome', icon: <User className="w-5 h-5" /> },
@@ -91,17 +116,15 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
   };
 
   const uploadFile = async (file: File, respostaId: string, tipoDocumento: 'foto' | 'exame') => {
-    // Log da tentativa de upload
-    console.log(`[UPLOAD_LOGS] START - Tipo: ${tipoDocumento}, Arquivo: ${file.name}, Tamanho: ${file.size}, MimeType: ${file.type}, LastModified: ${file.lastModified}`);
+    logToScreen('log', `[UPLOAD_LOGS] START - Tipo: ${tipoDocumento}, Arquivo: ${file.name}, Tamanho: ${file.size}, MimeType: ${file.type}, LastModified: ${file.lastModified}`);
     try {
-      // Tentar logar o objeto File serializado pode ser útil, mas pode falhar/ser grande
-      console.log('[UPLOAD_LOGS] File Object (JSON.stringify attempt):', JSON.stringify(file));
+      logToScreen('log', '[UPLOAD_LOGS] File Object (JSON.stringify attempt):', file);
     } catch (e: any) {
-      console.warn('[UPLOAD_LOGS] Could not stringify complete File object:', e.message);
+      logToScreen('warn', '[UPLOAD_LOGS] Could not stringify complete File object directly for screen log:', e.message);
     }
 
     try {
-      console.log(`[UPLOAD_LOGS ${tipoDocumento}] Requesting signed URL for: ${file.name}`);
+      logToScreen('log', `[UPLOAD_LOGS ${tipoDocumento}] Requesting signed URL for: ${file.name}`);
       const { data: signedUrlData, error: signedUrlError } = await supabase.functions.invoke('gerar-url-upload', {
         body: {
           fileName: file.name,
@@ -111,21 +134,21 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
       });
 
       if (signedUrlError) {
-        console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to get signed URL for ${file.name}:`, signedUrlError.message, signedUrlError);
+        logToScreen('error', `[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to get signed URL for ${file.name}:`, signedUrlError.message, signedUrlError);
         setUploadError(prev => `${prev || ''}Falha ao obter URL para ${file.name}: ${signedUrlError.message}. `);
         setFilesUploaded(prev => prev + 1);
         return;
       }
 
       if (!signedUrlData || !signedUrlData.signedUrl || !signedUrlData.path) {
-        console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Invalid signed URL data for ${file.name}:`, signedUrlData);
+        logToScreen('error', `[UPLOAD_LOGS ${tipoDocumento}] ERROR - Invalid signed URL data for ${file.name}:`, signedUrlData);
         setUploadError(prev => `${prev || ''}Dados de URL inválidos para ${file.name}. `);
         setFilesUploaded(prev => prev + 1);
         return;
       }
 
       const { signedUrl, path: pathStorage } = signedUrlData;
-      console.log(`[UPLOAD_LOGS ${tipoDocumento}] Got signed URL for ${file.name}. URL: ${signedUrl}, Uploading to path: ${pathStorage}`);
+      logToScreen('log', `[UPLOAD_LOGS ${tipoDocumento}] Got signed URL for ${file.name}. URL: ${signedUrl}, Uploading to path: ${pathStorage}`);
 
       const response = await fetch(signedUrl, {
         method: 'PUT',
@@ -140,14 +163,14 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
         try {
             errorBodyText = await response.text();
         } catch (e: any) {
-            console.warn(`[UPLOAD_LOGS ${tipoDocumento}] WARN - Could not read text from error response for ${file.name}: ${e.message}`);
+            logToScreen('warn', `[UPLOAD_LOGS ${tipoDocumento}] WARN - Could not read text from error response for ${file.name}: ${e.message}`);
         }
-        console.error(`[UPLOAD_LOGS ${tipoDocumento}] FAILED - Direct upload to Storage failed for ${file.name} (Status: ${response.status}, StatusText: ${response.statusText}). Body:`, errorBodyText);
+        logToScreen('error', `[UPLOAD_LOGS ${tipoDocumento}] FAILED - Direct upload to Storage failed for ${file.name} (Status: ${response.status}, StatusText: ${response.statusText}). Body:`, errorBodyText);
         setUploadError(prev => `${prev || ''}Upload direto falhou para ${file.name} (Status: ${response.status}). Detalhe: ${errorBodyText}. `);
       } else {
-        console.log(`[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully uploaded ${file.name} directly to Storage. Path: ${pathStorage}`);
+        logToScreen('log', `[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully uploaded ${file.name} directly to Storage. Path: ${pathStorage}`);
 
-        console.log(`[UPLOAD_LOGS ${tipoDocumento}] Registering metadata for ${file.name}, path: ${pathStorage}`);
+        logToScreen('log', `[UPLOAD_LOGS ${tipoDocumento}] Registering metadata for ${file.name}, path: ${pathStorage}`);
         const { error: metaError } = await supabase.functions.invoke('upload-arquivo-paciente', {
           body: {
             resposta_paciente_id: respostaId,
@@ -160,28 +183,27 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
         });
 
         if (metaError) {
-          console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to register metadata for ${file.name}:`, metaError.message, metaError);
+          logToScreen('error', `[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to register metadata for ${file.name}:`, metaError.message, metaError);
           setUploadError(prev => `${prev || ''}Falha ao registrar metadados para ${file.name}: ${metaError.message}. `);
         } else {
-          console.log(`[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully registered metadata for ${file.name}`);
+          logToScreen('log', `[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully registered metadata for ${file.name}`);
         }
       }
 
     } catch (err: any) {
       let detailedErrorMessage = err.message;
-      console.error(
+      logToScreen(
+        'error',
         `[UPLOAD_LOGS ${tipoDocumento}] EXCEPTION - Upload process for ${file.name}: `,
         'Message:', err.message, 
         'Name:', err.name, 
-        'Stack:', err.stack,
-        err.cause ? 'Cause:' : '', err.cause ? JSON.stringify(err.cause, Object.getOwnPropertyNames(err.cause)) : ''
+        err.cause ? 'Cause:' : '', err.cause
       );
       if (err.cause) {
         try {
-          // Tentar serializar 'cause' de forma mais robusta se for um objeto complexo
           const causeDetails = JSON.stringify(err.cause, Object.getOwnPropertyNames(err.cause));
           detailedErrorMessage += ` Causa: ${causeDetails}`;
-        } catch (stringifyError: any) { // Corrigido o tipo aqui
+        } catch (stringifyError: any) { 
           detailedErrorMessage += ` Causa: (não foi possível serializar causa - ${stringifyError.message})`;
         }
       }
@@ -352,6 +374,23 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
                 <p className="font-semibold">Erro no upload de arquivos:</p>
                 <p className="text-sm">{uploadError}</p>
             </div>
+          </div>
+        )}
+
+        {debugMessages.length > 0 && (
+          <div className="my-4 p-3 border bg-gray-100 rounded-md text-xs text-gray-700">
+            <div className="flex justify-between items-center mb-1">
+              <h4 className="font-semibold">Logs de Depuração:</h4>
+              <button 
+                onClick={() => setDebugMessages([])} 
+                className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+              >
+                Limpar Logs
+              </button>
+            </div>
+            <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap break-all">
+              {debugMessages.join('\n')}
+            </pre>
           </div>
         )}
 
