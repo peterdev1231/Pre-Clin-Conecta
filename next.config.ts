@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    fontLoaders: [
+      { loader: '@next/font/google', options: { subset: false } },
+    ],
+  },
   /* config options here */
 };
 
