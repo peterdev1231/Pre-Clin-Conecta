@@ -68,6 +68,7 @@ export default function ResponsesHeader({
   onGenerateNewLink 
 }: ResponsesHeaderProps) {
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
+  console.log("Estado inicial isDatePopoverOpen:", isDatePopoverOpen);
 
   const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
     if (range?.from) setStartDate(range.from);
@@ -82,6 +83,7 @@ export default function ResponsesHeader({
     const { from, to } = preset.getValue();
     setStartDate(from);
     setEndDate(to);
+    console.log("Preset selecionado, fechando popover.");
     setIsDatePopoverOpen(false);
   };
 
@@ -91,37 +93,32 @@ export default function ResponsesHeader({
   };
 
   return (
-    <div className="mb-6 md:mb-8 p-6 md:p-8 bg-teal-600 dark:bg-teal-700 rounded-xl shadow-lg">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-        {/* Título e Subtítulo */}
-        <div className="flex-1">
-          <h1 className="text-3xl md:text-4xl font-semibold text-white">
+    <div className="z-10 sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-slate-800 dark:to-slate-900 shadow-md p-4 rounded-b-lg mb-6">
+      <div className="container mx-auto px-0 sm:px-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">
             Respostas dos Pacientes
           </h1>
-          <p className="mt-1 text-teal-100 dark:text-teal-200 text-sm md:text-base">
+          <p className="text-sm text-white/80 text-center sm:text-left max-w-md">
             Visualize e gerencie as informações pré-consulta para um atendimento mais eficiente.
           </p>
         </div>
-
-        {/* Ações Globais */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 flex-wrap flex-shrink-0">
-          {/* Barra de Busca */}
-          <div className="relative w-full sm:w-auto grow sm:grow-0">
-            <input 
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 items-center gap-3">
+          {/* Search Input */}
+          <div className="relative lg:col-span-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-teal-700/70 dark:text-slate-300/70" />
+            <input
               type="text"
+              placeholder="Buscar paciente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar paciente..."
-              className="w-full sm:w-64 pl-10 pr-4 py-2.5 border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 outline-none transition-all shadow-sm hover:shadow-md placeholder-teal-700/70 dark:placeholder-slate-300/70"
+              className="w-full pl-10 pr-4 py-2.5 border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 shadow-sm hover:shadow-md transition-all duration-150 ease-in-out"
             />
-            <div className="absolute left-3 inset-y-0 flex items-center pointer-events-none">
-              <Search className="w-5 h-5 text-teal-600 dark:text-slate-300/80" />
-            </div>
           </div>
 
-          {/* Filtro de Status */}
+          {/* Status Filter */}
           <Select value={statusFilter} onValueChange={(value: 'Todos' | 'Lido' | 'Não Lido') => setStatusFilter(value)}>
-            <SelectTrigger className="w-full sm:w-[180px] border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 shadow-sm hover:shadow-md">
+            <SelectTrigger className="w-full sm:w-[180px] border-transparent rounded-lg bg-white/90 dark:bg-slate-800/60 text-teal-800 dark:text-slate-100 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 shadow-sm hover:shadow-md transition-all duration-150 ease-in-out">
               <SelectValue placeholder="Filtrar por status" className="placeholder-teal-700/70 dark:placeholder-slate-300/70" />
             </SelectTrigger>
             <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-teal-800 dark:text-slate-100 rounded-md shadow-lg">
@@ -132,7 +129,10 @@ export default function ResponsesHeader({
           </Select>
 
           {/* Date Range Picker */}
-          <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
+          <Popover open={isDatePopoverOpen} onOpenChange={(open) => {
+            console.log("Popover onOpenChange, novo estado:", open);
+            setIsDatePopoverOpen(open);
+          }}>
             <PopoverTrigger asChild>
               <Button
                 id="date"
