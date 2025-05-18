@@ -98,12 +98,11 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
     }
   };
 
-  const handleFileUploadStart = (file: File, tipoDocumento: 'foto' | 'exame') => {
+  const handleFileUploadStart = (file: File, tipoDocumento: 'foto' | 'exame', localFileId: string) => {
     if (!submissionAttemptId) {
       console.error("submissionAttemptId ainda não está definido. Upload não pode iniciar.");
-      return; 
+      return;
     }
-    const localFileId = `${file.name}-${file.lastModified}-${uuidv4()}`;
     setFileUploads(prev => ({
       ...prev,
       [localFileId]: {
@@ -118,14 +117,27 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
 
   const updateFileUploadState = (localFileId: string, newState: Partial<FileUploadState>) => {
     setFileUploads(prev => {
-      if (!prev[localFileId]) {
-        console.warn(`[Stepper] Tentativa de atualizar estado para ID de arquivo desconhecido: ${localFileId}`);
-        return prev;
+      if (!prev[localFileId] && newState.file && newState.status === 'pending' && newState.id === localFileId && newState.tipoDocumento) {
+        return {
+          ...prev,
+          [localFileId]: {
+            id: localFileId,
+            file: newState.file,
+            status: newState.status,
+            progress: newState.progress || 0,
+            tipoDocumento: newState.tipoDocumento,
+            error: newState.error,
+            pathStorage: newState.pathStorage,
+          },
+        };
+      } else if (prev[localFileId]) {
+        return {
+          ...prev,
+          [localFileId]: { ...prev[localFileId], ...newState },
+        };
       }
-      return {
-        ...prev,
-        [localFileId]: { ...prev[localFileId], ...newState },
-      };
+      console.warn(`[Stepper] Tentativa de atualizar estado para ID de arquivo desconhecido OU criação inválida: ${localFileId}`, newState);
+      return prev;
     });
   };
 
@@ -280,6 +292,7 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
             {currentStep === 5 && submissionAttemptId && (
               <Step5UploadFotos 
                 submissionAttemptId={submissionAttemptId}
+                onFileUploadStart={handleFileUploadStart}
                 updateFileStateInStepper={updateFileUploadState}
                 initialFiles={Object.values(fileUploads).filter(f => f.tipoDocumento === 'foto')}
               />
@@ -287,6 +300,7 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
             {currentStep === 6 && submissionAttemptId && (
               <Step6UploadExames
                 submissionAttemptId={submissionAttemptId}
+                onFileUploadStart={handleFileUploadStart}
                 updateFileStateInStepper={updateFileUploadState}
                 initialFiles={Object.values(fileUploads).filter(f => f.tipoDocumento === 'exame')}
               />

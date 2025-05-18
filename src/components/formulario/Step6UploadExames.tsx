@@ -16,6 +16,7 @@ interface FileUploadState {
 
 interface Step6UploadExamesProps {
   submissionAttemptId: string;
+  onFileUploadStart: (file: File, tipoDocumento: 'foto' | 'exame', localFileId: string) => void;
   updateFileStateInStepper: (localFileId: string, newState: Partial<FileUploadState>) => void;
   initialFiles: FileUploadState[]; // Arquivos já conhecidos pelo Stepper (do tipo exame)
   // onRemoveFileInStepper: (localFileId: string) => void; // Para futura implementação
@@ -23,6 +24,7 @@ interface Step6UploadExamesProps {
 
 const Step6UploadExames: React.FC<Step6UploadExamesProps> = ({ 
   submissionAttemptId,
+  onFileUploadStart,
   updateFileStateInStepper,
   initialFiles 
 }) => {
@@ -34,25 +36,27 @@ const Step6UploadExames: React.FC<Step6UploadExamesProps> = ({
       event.target.value = ''; 
 
       for (const file of newFiles) {
+        const tipoDocumento = 'exame';
         const localFileId = `${file.name}-${file.lastModified}-${uuidv4()}`;
-        const tipoDocumento = 'exame'; // MODIFICADO para 'exame'
 
-        updateFileStateInStepper(localFileId, {
-          id: localFileId,
-          file,
-          status: 'pending',
-          progress: 0,
-          tipoDocumento,
-        });
+        onFileUploadStart(file, tipoDocumento, localFileId);
 
         try {
           updateFileStateInStepper(localFileId, { status: 'getting_url', progress: 10 });
+
+          console.log('[Step6UploadExames] Chamando gerar-url-upload com:', {
+            fileName: file.name,
+            submissionAttemptId,
+            tipoDocumento
+          });
+
           const { data: signedUrlData, error: signedUrlError } = await supabase.functions.invoke(
             'gerar-url-upload',
             { body: { fileName: file.name, submissionAttemptId, tipoDocumento } }
           );
 
           if (signedUrlError || !signedUrlData?.signedUrl) {
+            console.error('[Step6UploadExames] Signed URL Error:', signedUrlError, signedUrlData);
             throw signedUrlError || new Error('URL de upload inválida retornada pela função.');
           }
           const { signedUrl, path: pathStorage } = signedUrlData;
@@ -92,11 +96,12 @@ const Step6UploadExames: React.FC<Step6UploadExamesProps> = ({
           });
 
           if (metaError) {
+            console.error('[Step6UploadExames] Metadata Error:', metaError);
             throw metaError;
           }
           updateFileStateInStepper(localFileId, { status: 'completed', progress: 100 });
         } catch (error: any) {
-          console.error(`Erro no processamento do arquivo ${file.name} (tipo: ${tipoDocumento}):`, error);
+          console.error(`Erro no processamento do arquivo ${file.name} (tipo: ${tipoDocumento}, localId: ${localFileId}):`, error);
           updateFileStateInStepper(localFileId, { 
             status: 'error', 
             progress: 0,

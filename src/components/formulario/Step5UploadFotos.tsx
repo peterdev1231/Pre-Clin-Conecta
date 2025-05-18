@@ -17,6 +17,7 @@ interface FileUploadState {
 
 interface Step5UploadFotosProps {
   submissionAttemptId: string;
+  onFileUploadStart: (file: File, tipoDocumento: 'foto' | 'exame', localFileId: string) => void;
   updateFileStateInStepper: (localFileId: string, newState: Partial<FileUploadState>) => void;
   initialFiles: FileUploadState[]; // Arquivos já conhecidos pelo Stepper (do tipo foto)
   // TODO: Adicionar uma prop para remover/cancelar um upload
@@ -25,6 +26,7 @@ interface Step5UploadFotosProps {
 
 const Step5UploadFotos: React.FC<Step5UploadFotosProps> = ({ 
   submissionAttemptId,
+  onFileUploadStart,
   updateFileStateInStepper,
   initialFiles 
 }) => {
@@ -39,27 +41,30 @@ const Step5UploadFotos: React.FC<Step5UploadFotosProps> = ({
       event.target.value = ''; // Limpar para permitir selecionar o mesmo arquivo novamente
 
       for (const file of newFiles) {
-        const localFileId = `${file.name}-${file.lastModified}-${uuidv4()}`;
         const tipoDocumento = 'foto';
+        const localFileId = `${file.name}-${file.lastModified}-${uuidv4()}`;
 
-        // 1. Notificar o Stepper que um arquivo está pendente
-        updateFileStateInStepper(localFileId, {
-          id: localFileId,
-          file,
-          status: 'pending',
-          progress: 0,
-          tipoDocumento,
-        });
+        // 1. Chamar onFileUploadStart para que o Stepper crie a entrada inicial.
+        onFileUploadStart(file, tipoDocumento, localFileId);
 
+        // AGORA, as chamadas subsequentes a updateFileStateInStepper devem encontrar o ID.
         try {
-          // 2. Obter URL assinada para upload
           updateFileStateInStepper(localFileId, { status: 'getting_url', progress: 10 });
+          
+          // ADICIONAR CONSOLE.LOG PARA DEBUG
+          console.log('[Step5UploadFotos] Chamando gerar-url-upload com:', {
+            fileName: file.name,
+            submissionAttemptId,
+            tipoDocumento
+          });
+
           const { data: signedUrlData, error: signedUrlError } = await supabase.functions.invoke(
             'gerar-url-upload',
             { body: { fileName: file.name, submissionAttemptId, tipoDocumento } }
           );
 
           if (signedUrlError || !signedUrlData?.signedUrl) {
+            console.error('[Step5UploadFotos] Signed URL Error:', signedUrlError, signedUrlData);
             throw signedUrlError || new Error('URL de upload inválida retornada pela função.');
           }
           const { signedUrl, path: pathStorage } = signedUrlData;
@@ -103,13 +108,14 @@ const Step5UploadFotos: React.FC<Step5UploadFotosProps> = ({
           });
 
           if (metaError) {
+            console.error('[Step5UploadFotos] Metadata Error:', metaError);
             throw metaError;
           }
 
           updateFileStateInStepper(localFileId, { status: 'completed', progress: 100 });
 
         } catch (error: any) {
-          console.error(`Erro no processamento do arquivo ${file.name}:`, error);
+          console.error(`Erro no processamento do arquivo ${file.name} (localId: ${localFileId}):`, error);
           updateFileStateInStepper(localFileId, { 
             status: 'error', 
             progress: 0, // Resetar progresso em caso de erro
