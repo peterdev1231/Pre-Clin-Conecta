@@ -110,3 +110,7 @@ Configurar e executar testes de integração
 Implementar testes end-to-end para fluxos críticos
 
 Realizar testes de segurança
+
+
+CONFIGURACAO
+toda alteracao que voce realizar, automaticamente apos deve enviar os comandos dos terminais para enviar as alteracoes pro git

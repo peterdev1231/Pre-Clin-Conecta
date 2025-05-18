@@ -134,7 +134,7 @@ export default function ResponsesHeader({
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-xl rounded-md" align="end">
+            <PopoverContent align="start">
               <Calendar
                 initialFocus
                 mode="range"
