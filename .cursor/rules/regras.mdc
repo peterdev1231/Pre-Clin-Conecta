@@ -1,0 +1,112 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Atue como um programador tecnigo, logico, extremamente avançado e nunca "preguiçoso" sempre fala comigo em pt-br
+
+Semana 1: Definição e Setup
+Dia 1-2: Definição de Requisitos
+
+Documentar detalhadamente os requisitos finais
+Definir fluxos de usuário (wireframes)
+Estabelecer métricas de sucesso do projeto
+
+Dia 3-4: Arquitetura e Tecnologia
+
+Finalizar escolha de tecnologias que vc tem mais conhecimento
+
+
+
+
+
+Semana 2: Configuração Inicial
+Dia 1-2: Setup da Infraestrutura
+
+Configurar servidores de desenvolvimento e staging
+Configurar banco de dados PostgreSQL
+Configurar bucket S3 para arquivos
+Implementar sistema de logs e monitoramento
+
+Dia 3-5: Setup do Projeto
+
+Inicializar projeto frontend (
+Inicializar projeto backend 
+Configurar autenticação JWT
+Implementar estrutura base de banco de dados
+
+Fase 2: Desenvolvimento do projeto
+Semana 3: Backend - Core
+Dia 1-2: Sistema de Autenticação
+
+Implementar registro e login de médicos
+Implementar gestão de sessões e tokens
+Implementar recuperação de senha
+
+Dia 3-5: API de Gerenciamento de Links
+
+Implementar geração de links únicos
+Implementar verificação de validade de links
+Implementar sistema de expiração automática
+
+Semana 4: Backend - Formulários e Respostas
+Dia 1-3: API de Formulários
+
+Implementar endpoints para servir o formulário
+Implementar validação de dados do formulário
+Implementar armazenamento de respostas
+
+Dia 4-5: API de Arquivos
+
+Implementar upload seguro de imagens e documentos
+Implementar validação e sanitização de arquivos
+Implementar integração com S3
+
+Semana 5: Frontend - Portal do Médico
+Dia 1-2: Interface de Autenticação
+
+Implementar telas de login e recuperação de senha
+Implementar gerenciamento de sessão no cliente
+Implementar proteção de rotas
+
+Dia 3-5: Dashboard Principal
+
+Implementar listagem de respostas 
+Implementar filtros e pesquisa
+Implementar geração de novos links
+
+Semana 6: Frontend - Formulário do Paciente e Detalhes
+Dia 1-3: Formulário do Paciente
+
+Implementar formulário responsivo em etapas:
+
+Etapa 1: Nome do paciente
+Etapa 2: Queixa principal
+Etapa 3: Medicações em uso
+Etapa 4: Alergias conhecidas
+Etapa 5: Upload de fotos (opcional)
+Etapa 6: Upload de exames (opcional)
+Etapa 7: Revisão e confirmação
+
+
+
+Dia 4-5: Visualização Detalhada
+
+Implementar tela de detalhe da resposta (conforme sua segunda imagem)
+Implementar visualizador de imagens/documentos
+Implementar ações (marcar como lido, imprimir)
+
+Fase 3: Testes e Refinamento (2 semanas)
+Semana 7: Testes
+Dia 1-2: Testes de Unidade
+
+Implementar testes para componentes críticos
+Implementar testes para APIs principais
+Configurar testes automatizados na CI
+
+Dia 3-5: Testes de Integração e E2E
+
+Configurar e executar testes de integração
+Implementar testes end-to-end para fluxos críticos
+
+Realizar testes de segurança
