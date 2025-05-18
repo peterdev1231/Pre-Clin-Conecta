@@ -92,11 +92,16 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
 
   const uploadFile = async (file: File, respostaId: string, tipoDocumento: 'foto' | 'exame') => {
     // Log da tentativa de upload
-    console.log(`[NEW UPLOAD PROCESS] Starting for: ${file.name}, Size: ${file.size}, Type: ${file.type}, DocType: ${tipoDocumento}`);
+    console.log(`[UPLOAD_LOGS] START - Tipo: ${tipoDocumento}, Arquivo: ${file.name}, Tamanho: ${file.size}, MimeType: ${file.type}, LastModified: ${file.lastModified}`);
+    try {
+      // Tentar logar o objeto File serializado pode ser útil, mas pode falhar/ser grande
+      console.log('[UPLOAD_LOGS] File Object (JSON.stringify attempt):', JSON.stringify(file));
+    } catch (e: any) {
+      console.warn('[UPLOAD_LOGS] Could not stringify complete File object:', e.message);
+    }
 
     try {
-      // 1. Obter a URL assinada da nossa nova Edge Function
-      console.log(`[NEW UPLOAD PROCESS] Requesting signed URL for: ${file.name}`);
+      console.log(`[UPLOAD_LOGS ${tipoDocumento}] Requesting signed URL for: ${file.name}`);
       const { data: signedUrlData, error: signedUrlError } = await supabase.functions.invoke('gerar-url-upload', {
         body: {
           fileName: file.name,
@@ -106,43 +111,44 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
       });
 
       if (signedUrlError) {
-        console.error(`[NEW UPLOAD PROCESS] Failed to get signed URL for ${file.name}:`, signedUrlError);
-        setUploadError(prev => `${prev || ''} Falha ao obter URL para ${file.name}: ${signedUrlError.message}. `);
-        setFilesUploaded(prev => prev + 1); // Incrementa para que o contador de progresso avance
-        return; 
+        console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to get signed URL for ${file.name}:`, signedUrlError.message, signedUrlError);
+        setUploadError(prev => `${prev || ''}Falha ao obter URL para ${file.name}: ${signedUrlError.message}. `);
+        setFilesUploaded(prev => prev + 1);
+        return;
       }
 
       if (!signedUrlData || !signedUrlData.signedUrl || !signedUrlData.path) {
-        console.error(`[NEW UPLOAD PROCESS] Invalid signed URL data for ${file.name}:`, signedUrlData);
-        setUploadError(prev => `${prev || ''} Dados de URL inválidos para ${file.name}. `);
-        setFilesUploaded(prev => prev + 1); // Incrementa para que o contador de progresso avance
+        console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Invalid signed URL data for ${file.name}:`, signedUrlData);
+        setUploadError(prev => `${prev || ''}Dados de URL inválidos para ${file.name}. `);
+        setFilesUploaded(prev => prev + 1);
         return;
       }
 
       const { signedUrl, path: pathStorage } = signedUrlData;
-      console.log(`[NEW UPLOAD PROCESS] Got signed URL for ${file.name}, Uploading to: ${signedUrl}`);
+      console.log(`[UPLOAD_LOGS ${tipoDocumento}] Got signed URL for ${file.name}. URL: ${signedUrl}, Uploading to path: ${pathStorage}`);
 
-      // 2. Fazer o upload direto para o Supabase Storage usando a URL assinada
       const response = await fetch(signedUrl, {
         method: 'PUT',
         headers: {
-          // O Content-Type é importante para o PUT na URL assinada do Supabase Storage.
-          // Se não for fornecido, o Storage pode não saber como lidar com o arquivo ou pode definir um tipo genérico.
           'Content-Type': file.type || 'application/octet-stream',
         },
         body: file,
       });
 
       if (!response.ok) {
-        const errorBody = await response.text();
-        console.error(`[NEW UPLOAD PROCESS] Direct upload to Storage failed for ${file.name} (Status: ${response.status}):`, errorBody);
-        setUploadError(prev => `${prev || ''} Upload direto falhou para ${file.name}. `);
+        let errorBodyText = 'Could not read error body';
+        try {
+            errorBodyText = await response.text();
+        } catch (e: any) {
+            console.warn(`[UPLOAD_LOGS ${tipoDocumento}] WARN - Could not read text from error response for ${file.name}: ${e.message}`);
+        }
+        console.error(`[UPLOAD_LOGS ${tipoDocumento}] FAILED - Direct upload to Storage failed for ${file.name} (Status: ${response.status}, StatusText: ${response.statusText}). Body:`, errorBodyText);
+        setUploadError(prev => `${prev || ''}Upload direto falhou para ${file.name} (Status: ${response.status}). Detalhe: ${errorBodyText}. `);
       } else {
-        console.log(`[NEW UPLOAD PROCESS] Successfully uploaded ${file.name} directly to Storage. Path: ${pathStorage}`);
+        console.log(`[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully uploaded ${file.name} directly to Storage. Path: ${pathStorage}`);
 
-        // 3. Registrar metadados no banco
-        console.log(`[NEW UPLOAD PROCESS] Registering metadata for ${file.name}, path: ${pathStorage}`);
-        const { error: metaError } = await supabase.functions.invoke('upload-arquivo-paciente', { // Usando o slug antigo, que agora tem a nova lógica
+        console.log(`[UPLOAD_LOGS ${tipoDocumento}] Registering metadata for ${file.name}, path: ${pathStorage}`);
+        const { error: metaError } = await supabase.functions.invoke('upload-arquivo-paciente', {
           body: {
             resposta_paciente_id: respostaId,
             nome_arquivo_original: file.name,
@@ -154,16 +160,32 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
         });
 
         if (metaError) {
-          console.error(`[NEW UPLOAD PROCESS] Failed to register metadata for ${file.name}:`, metaError);
-          setUploadError(prev => `${prev || ''} Falha ao registrar metadados para ${file.name}: ${metaError.message}. `);
+          console.error(`[UPLOAD_LOGS ${tipoDocumento}] ERROR - Failed to register metadata for ${file.name}:`, metaError.message, metaError);
+          setUploadError(prev => `${prev || ''}Falha ao registrar metadados para ${file.name}: ${metaError.message}. `);
         } else {
-          console.log(`[NEW UPLOAD PROCESS] Successfully registered metadata for ${file.name}`);
+          console.log(`[UPLOAD_LOGS ${tipoDocumento}] SUCCESS - Successfully registered metadata for ${file.name}`);
         }
       }
 
     } catch (err: any) {
-      console.error(`[NEW UPLOAD PROCESS] Exception during upload process for ${file.name}:`, err);
-      setUploadError(prev => `${prev || ''} Exceção no upload de ${file.name}: ${err.message}. `);
+      let detailedErrorMessage = err.message;
+      console.error(
+        `[UPLOAD_LOGS ${tipoDocumento}] EXCEPTION - Upload process for ${file.name}: `,
+        'Message:', err.message, 
+        'Name:', err.name, 
+        'Stack:', err.stack,
+        err.cause ? 'Cause:' : '', err.cause ? JSON.stringify(err.cause, Object.getOwnPropertyNames(err.cause)) : ''
+      );
+      if (err.cause) {
+        try {
+          // Tentar serializar 'cause' de forma mais robusta se for um objeto complexo
+          const causeDetails = JSON.stringify(err.cause, Object.getOwnPropertyNames(err.cause));
+          detailedErrorMessage += ` Causa: ${causeDetails}`;
+        } catch (stringifyError: any) { // Corrigido o tipo aqui
+          detailedErrorMessage += ` Causa: (não foi possível serializar causa - ${stringifyError.message})`;
+        }
+      }
+      setUploadError(prev => `${prev || ''}Exceção no upload de ${file.name}: ${detailedErrorMessage}. `);
     } finally {
       setFilesUploaded(prev => prev + 1);
     }
