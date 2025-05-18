@@ -1,6 +1,6 @@
-'use client';
-
 console.log("COMPONENTE ResponsesHeader CARREGADO");
+
+'use client';
 
 import React, { useState } from 'react';
 import { Search, RefreshCw, PlusCircle, Calendar as CalendarIcon } from 'lucide-react';
@@ -69,8 +69,8 @@ export default function ResponsesHeader({
   onRefresh, 
   onGenerateNewLink 
 }: ResponsesHeaderProps) {
+  console.log("FUNÇÃO ResponsesHeader EXECUTADA");
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
-  console.log("Estado inicial isDatePopoverOpen:", isDatePopoverOpen);
 
   const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
     if (range?.from) setStartDate(range.from);
@@ -85,7 +85,6 @@ export default function ResponsesHeader({
     const { from, to } = preset.getValue();
     setStartDate(from);
     setEndDate(to);
-    console.log("Preset selecionado, fechando popover.");
     setIsDatePopoverOpen(false);
   };
 
@@ -132,7 +131,6 @@ export default function ResponsesHeader({
 
           {/* Date Range Picker */}
           <Popover open={isDatePopoverOpen} onOpenChange={(open) => {
-            console.log("Popover onOpenChange, novo estado:", open);
             setIsDatePopoverOpen(open);
           }}>
             <PopoverTrigger asChild>
