@@ -6,8 +6,17 @@ interface Step4AlergiasProps {
     alergiasConhecidas: string;
     naoPossuiAlergias?: boolean;
   };
-  onChange: (name: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onChange: (name: 'alergiasConhecidas' | 'naoPossuiAlergias') => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
+
+// Interface FormData para referência (não adicionar ao arquivo, apenas para contexto do diff)
+// interface FormData {
+//   nomePaciente: string;
+//   queixaPrincipal: string;
+//   medicacoesEmUso: string;
+//   alergiasConhecidas: string;
+//   naoPossuiAlergias?: boolean;
+// }
 
 const Step4Alergias: React.FC<Step4AlergiasProps> = ({ formData, onChange }) => {
   return (
