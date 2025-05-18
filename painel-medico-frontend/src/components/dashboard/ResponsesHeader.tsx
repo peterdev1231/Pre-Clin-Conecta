@@ -1,5 +1,3 @@
-console.log("COMPONENTE ResponsesHeader CARREGADO");
-
 'use client';
 
 import React, { useState } from 'react';
@@ -21,6 +19,8 @@ import {
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+console.log("MODULO ResponsesHeader CARREGADO E PROCESSADO");
 
 interface ResponsesHeaderProps {
   searchTerm: string;
@@ -69,7 +69,6 @@ export default function ResponsesHeader({
   onRefresh, 
   onGenerateNewLink 
 }: ResponsesHeaderProps) {
-  console.log("FUNÇÃO ResponsesHeader EXECUTADA");
   const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
 
   const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
