@@ -96,17 +96,22 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
     uploadFormData.append('respostaPacienteId', respostaId);
     uploadFormData.append('tipoDocumento', tipoDocumento);
 
+    console.log(`[UPLOAD ATTEMPT] File: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}, DocumentType: ${tipoDocumento}, RespostaID: ${respostaId}`);
+
     try {
-      const { error: uploadError } = await supabase.functions.invoke('upload-arquivo-paciente', {
+      const { data: functionData, error: uploadError } = await supabase.functions.invoke('upload-arquivo-paciente', {
         body: uploadFormData,
       });
+
       if (uploadError) {
-        console.error(`Erro ao fazer upload do arquivo ${file.name}:`, uploadError);
-        setUploadError(prev => prev ? `${prev}, ${file.name}` : `Falha no upload de: ${file.name}`);
+        console.error(`[UPLOAD FAILED - FUNCTION ERROR] File: ${file.name}, DocumentType: ${tipoDocumento}, Error:`, uploadError);
+        setUploadError(prev => prev ? `${prev}, ${file.name} (function error)` : `Falha no upload de: ${file.name} (function error)`);
+      } else {
+        console.log(`[UPLOAD SUCCESS - FUNCTION INVOKED] File: ${file.name}, DocumentType: ${tipoDocumento}, ResponseData:`, functionData);
       }
     } catch (err) {
-      console.error(`Exceção ao fazer upload do arquivo ${file.name}:`, err);
-      setUploadError(prev => prev ? `${prev}, ${file.name}` : `Falha no upload de: ${file.name}`);
+      console.error(`[UPLOAD FAILED - EXCEPTION] File: ${file.name}, DocumentType: ${tipoDocumento}, Exception:`, err);
+      setUploadError(prev => prev ? `${prev}, ${file.name} (exception)` : `Falha no upload de: ${file.name} (exception)`);
     } finally {
       setFilesUploaded(prev => prev + 1);
     }
