@@ -31,6 +31,29 @@ export default function PatientResponsesView() {
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Lido' | 'Não Lido'>('Todos');
   const [isGenerateLinkModalOpen, setIsGenerateLinkModalOpen] = useState(false);
 
+  // Cálculo dos contadores
+  const totalCount = responses.length;
+  const unreadCount = responses.filter(r => r.status === 'Não Lido').length;
+  const readCount = responses.filter(r => r.status === 'Lido').length;
+
+  // Exemplo de estatística rápida (última resposta)
+  const recentStats = [];
+  if (responses.length > 0) {
+    const last = responses[0];
+    recentStats.push({
+      label: 'Último paciente',
+      value: last.nomePaciente,
+      icon: null
+    });
+    if (last.dataEnvio) {
+      recentStats.push({
+        label: 'Recebido em',
+        value: new Date(last.dataEnvio).toLocaleDateString('pt-BR'),
+        icon: null
+      });
+    }
+  }
+
   const fetchResponses = useCallback(async () => {
     console.log("[PatientResponsesView] fetchResponses called. User:", user?.id, "SearchTerm:", searchTerm, "StatusFilter:", statusFilter);
     if (!user) {
@@ -164,6 +187,10 @@ export default function PatientResponsesView() {
           console.log("[PatientResponsesView] Generate New Link button clicked.");
           setIsGenerateLinkModalOpen(true)
         }}
+        totalCount={totalCount}
+        unreadCount={unreadCount}
+        readCount={readCount}
+        recentStats={recentStats}
       />
       <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl p-6 md:p-8">
         <ResponsesTable 
