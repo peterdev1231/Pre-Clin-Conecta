@@ -25,12 +25,16 @@ const config = {
         background: "hsl(var(--background))", // Azul claro de fundo #EAF2FA
         foreground: "hsl(var(--foreground))", // Azul escuro para texto #1A2A44
         primary: {
-          DEFAULT: "hsl(var(--primary))", // Pode ser o azul escuro ou um tom principal
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#25392C", // Verde escuro premium
+          foreground: "#F0F2F0", // Cinza claro para contraste
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#C4E8C9", // Verde menta
+          foreground: "#25392C", // Verde escuro para contraste
+        },
+        tertiary: {
+          DEFAULT: "#F0F2F0", // Cinza claro
+          foreground: "#25392C",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
@@ -61,6 +65,10 @@ const config = {
         'fundo-gradiente-de': '#EAF2FA',
         'fundo-gradiente-para': '#F5F9FD',
         'sidebar-item-ativo': '#2A3B5A',
+        // Cores customizadas para fácil uso
+        'verde-escuro': '#25392C',
+        'verde-menta': '#C4E8C9',
+        'cinza-claro': '#F0F2F0',
       },
       borderRadius: {
         lg: "var(--radius)",
