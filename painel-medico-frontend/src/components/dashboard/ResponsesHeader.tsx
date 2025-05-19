@@ -38,7 +38,7 @@ export default function ResponsesHeader({
   recentStats = []
 }: ResponsesHeaderProps) {
   return (
-    <div data-testid="responses-header-main-div" className="z-10 sticky top-0 bg-gradient-to-b from-cinza-claro to-verde-menta/20 shadow-md p-6 rounded-b-xl mb-8">
+    <div data-testid="responses-header-main-div" className="z-10 sticky top-0 bg-gradient-to-b from-cinza-claro to-verde-menta/40 shadow-md p-6 rounded-b-xl mb-8">
       <div className="container mx-auto px-0 sm:px-4">
         {/* Título e subtítulo */}
         <div className="flex flex-col gap-1 sm:gap-2 mb-6">
