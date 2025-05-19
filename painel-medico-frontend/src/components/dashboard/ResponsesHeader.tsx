@@ -51,6 +51,9 @@ export default function ResponsesHeader({
     startDate && endDate ? { from: startDate, to: endDate } : undefined
   );
 
+  // Log para monitorar o estado do Popover
+  console.log("[ResponsesHeader] Estado inicial de isPopoverOpen:", isPopoverOpen);
+
   // Sincronizar o estado interno do calendário se as props externas mudarem
   useEffect(() => {
     if (startDate && endDate) {
@@ -112,11 +115,18 @@ export default function ResponsesHeader({
           </Select>
 
           {/* Date Range Picker REIMPLEMENTADO */}
-          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <Popover
+            open={isPopoverOpen}
+            onOpenChange={(open) => {
+              console.log("[ResponsesHeader] Popover onOpenChange, novo estado 'open':", open);
+              setIsPopoverOpen(open);
+            }}
+          >
             <PopoverTrigger asChild>
               <Button
                 id="date-range-picker-trigger"
                 variant={"outline"}
+                onClick={() => console.log("[ResponsesHeader] Botão 'Selecione o período' CLICADO!")}
                 className={cn(
                   "w-full sm:w-[260px] justify-start text-left font-normal bg-white/90 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 text-teal-800 dark:text-slate-100 border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:ring-2 focus:ring-white dark:focus:ring-teal-300 shadow-sm hover:shadow-md",
                   !startDate && "text-teal-700/70 dark:text-slate-300/70"
