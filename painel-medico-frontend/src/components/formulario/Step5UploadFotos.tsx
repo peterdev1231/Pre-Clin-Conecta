@@ -126,7 +126,7 @@ const Step5UploadFotos: React.FC<Step5UploadFotosProps> = ({
     }
   };
 
-  // A função de remover arquivo precisará ser reavaliada.
+  // A função de remover     arquivo precisará ser reavaliada.
   // Se o arquivo já foi enviado, a remoção envolve mais do que apenas o estado local.
   // Por agora, esta função não fará nada ou será removida para evitar confusão.
   const handleRemoveFileLocal = (localFileIdToRemove: string) => {
