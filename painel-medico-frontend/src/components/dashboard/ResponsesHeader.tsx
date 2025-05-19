@@ -80,7 +80,7 @@ export default function ResponsesHeader({
           <Button 
             onClick={onGenerateNewLink}
             variant="default"
-            className="w-full sm:w-auto bg-white text-teal-700 hover:bg-teal-50 focus:ring-offset-teal-600 dark:focus:ring-offset-teal-700"
+            className="w-full lg:col-span-4 bg-white text-teal-700 hover:bg-teal-50 focus:ring-offset-teal-600 dark:focus:ring-offset-teal-700"
           >
             <PlusCircle className="mr-2 w-5 h-5" />
             <span>Gerar Novo Link</span>
