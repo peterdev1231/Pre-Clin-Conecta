@@ -16,6 +16,7 @@ export default function UpdatePasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
+  const [isSessionReady, setIsSessionReady] = useState(false);
 
   // Lidar com o token da URL (geralmente no hash)
   useEffect(() => {
@@ -25,7 +26,8 @@ export default function UpdatePasswordForm() {
         // mas o Supabase JS SDK geralmente lida com isso internamente para updateUser.
         // Se o evento é PASSWORD_RECOVERY, significa que o usuário clicou no link de recuperação
         // e o SDK está pronto para a atualização da senha.
-        console.log('Sessão de recuperação de senha detectada.');
+        console.log('Sessão de recuperação de senha detectada e pronta.');
+        setIsSessionReady(true);
       }
     });
 
@@ -82,6 +84,13 @@ export default function UpdatePasswordForm() {
         <h1 className="text-3xl font-bold text-gray-800">Definir Nova Senha</h1>
         <p className="mt-2 text-gray-600">Crie uma nova senha para sua conta.</p>
       </div>
+
+      {!isSessionReady && !error && !success && (
+        <div className="flex items-center p-3.5 text-sm text-blue-700 bg-blue-100 rounded-lg border border-blue-300" role="alert">
+          <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <span className="font-medium">Aguarde, preparando formulário para definição de senha...</span>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center p-3.5 text-sm text-red-700 bg-red-100 rounded-lg border border-red-300" role="alert">
@@ -150,7 +159,7 @@ export default function UpdatePasswordForm() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isSessionReady}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-70 disabled:cursor-not-allowed transition duration-150 ease-in-out"
             >
               {loading ? (

@@ -90,11 +90,9 @@ serve(async (req: Request) => {
 
     console.log(`[gerar-url-upload] Signed URL generated successfully for path: ${data.path}`);
     
-    return new Response(JSON.stringify({
-      signedUrl: data.signedUrl,
-      path: data.path, // Este é o path_storage que salvaremos no banco depois
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // TESTE: Retornar apenas a string da URL assinada
+    return new Response(data.signedUrl, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/plain' }, // Mudar Content-Type
       status: 200,
     });
 
