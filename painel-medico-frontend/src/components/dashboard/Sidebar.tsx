@@ -13,9 +13,9 @@ import {
   LogOut,
   UserCircle2,
   X as XIcon, // Ícone para fechar o menu mobile
-  Stethoscope, // Adicionando Stethoscope
 } from 'lucide-react';
 import Image from 'next/image'; // Adicionando o import de Image de volta
+import CustomLogoIcon from '../icons/CustomLogoIcon'; // Importar o novo ícone
 
 // Define a type for MainContentView, mirroring DashboardLayout
 type MainContentView = 'default' | 'statistics';
@@ -77,9 +77,9 @@ export default function Sidebar({
       {/* Cabeçalho da Sidebar com Logo e Botão de Fechar (mobile) */}
       <div className="h-20 flex items-center justify-between px-4 border-b border-[#3A5A40]">
         <Link href="/dashboard" onClick={() => setCurrentView('default')} className="flex items-center space-x-2.5 text-xl font-semibold text-[#C4E8C9] hover:text-white transition-colors">
-          <Stethoscope className="w-8 h-8 text-[#C4E8C9]" /> {/* Ícone Stethoscope */} 
+          <CustomLogoIcon className="w-8 h-8 text-[#C4E8C9]" />
           <span>
-            PréClin<span className="font-light">Conecta</span> {/* Texto com Conecta mais leve */}
+            PréClin <span className="font-light">Conecta</span>
           </span>
         </Link>
         <button 
