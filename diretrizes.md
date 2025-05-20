@@ -13,6 +13,7 @@ Portal do Profissional de Saúde
 Painel para gerenciamento de respostas dos pacientes
 Geração e gerenciamento de links
 Configurações do sistema
+Exibir modais informativos sobre o status da assinatura (ex: trial expirado, plano expirado) com direcionamento para a página de vendas.
 
 
 Sistema de Formulário para Pacientes
@@ -198,6 +199,7 @@ Dia 3-5: Dashboard Principal
 Implementar listagem de respostas (UI base, busca de dados e responsividade OK; funcionalidade completa pendente)
 Implementar filtros e pesquisa (Pesquisa por nome OK; filtros avançados pendentes)
 [x] Implementar geração de novos links (Modal e chamada à Edge Function OK)
+Implementar modais de status da assinatura (trial expirado, plano expirado) com CTA para página de vendas.
 
 Semana 6: Frontend - Formulário do Paciente e Detalhes
 Dia 1-3: Formulário do Paciente

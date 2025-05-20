@@ -164,7 +164,7 @@ export default function LoginForm() {
       <p className="mt-8 text-center text-sm text-slate-600 dark:text-slate-400">
         Ainda não tem conta?{
         ' '}
-        <Link href="/cadastro" className="font-medium text-[#00A651] hover:text-[#008f48] dark:text-[#00A651] dark:hover:text-[#00C25D] hover:underline">
+        <Link href="https://meusite.com" target="_blank" rel="noopener noreferrer" className="font-medium text-[#00A651] hover:text-[#008f48] dark:text-[#00A651] dark:hover:text-[#00C25D] hover:underline">
           Crie uma agora
         </Link>
       </p>

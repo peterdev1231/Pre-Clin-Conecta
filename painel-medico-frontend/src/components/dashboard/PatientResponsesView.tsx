@@ -75,23 +75,23 @@ export default function PatientResponsesView() {
 
     try {
       console.log("[PatientResponsesView] Step 1: Fetching profissional_saude ID for user.id:", user.id);
-      const { data: profissionalData, error: profissionalError } = await supabase
-        .from('profissionais_saude')
+      const { data: perfilProfissionalData, error: perfilProfissionalError } = await supabase
+        .from('perfis_profissionais')
         .select('id')
-        .eq('id_usuario_supabase', user.id)
+        .eq('user_id', user.id)
         .single();
 
-      if (profissionalError) {
-        console.error("[PatientResponsesView] Error fetching profissional_saude:", profissionalError);
-        throw profissionalError;
+      if (perfilProfissionalError) {
+        console.error("[PatientResponsesView] Error fetching perfil profissional:", perfilProfissionalError);
+        throw perfilProfissionalError;
       }
-      if (!profissionalData) {
+      if (!perfilProfissionalData) {
         console.error("[PatientResponsesView] Perfil profissional não encontrado para user.id:", user.id);
-        throw new Error('Perfil profissional não encontrado.');
+        throw new Error('Perfil profissional não encontrado. O webhook pode não ter processado o usuário ainda ou houve uma falha.');
       }
       
-      const profissionalId = profissionalData.id;
-      console.log("[PatientResponsesView] Step 1 Result - Profissional ID:", profissionalId);
+      const profissionalId = perfilProfissionalData.id;
+      console.log("[PatientResponsesView] Step 1 Result - ID do Perfil Profissional (usado como profissional_id para links):", profissionalId);
 
       console.log("[PatientResponsesView] Step 2: Fetching links_formularios for profissional_id:", profissionalId);
       const { data: linksData, error: linksError } = await supabase
