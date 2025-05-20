@@ -67,7 +67,7 @@ export default function Sidebar({
   return (
     <aside 
       className={`
-        bg-slate-800 text-slate-300 flex flex-col h-screen shadow-lg 
+        bg-[#25392C] text-slate-200 flex flex-col h-screen shadow-lg 
         fixed inset-y-0 left-0 z-40 w-64 
         transition-transform duration-300 ease-in-out 
         md:translate-x-0 
@@ -75,9 +75,9 @@ export default function Sidebar({
       `}
     >
       {/* Cabeçalho da Sidebar com Logo e Botão de Fechar (mobile) */}
-      <div className="h-20 flex items-center justify-center px-4 border-b border-slate-700">
-        <Link href="/dashboard" onClick={() => setCurrentView('default')} className="flex items-center space-x-2.5 text-xl font-semibold text-white hover:text-teal-400 transition-colors">
-          <Stethoscope className="w-8 h-8" /> {/* Ícone Stethoscope */} 
+      <div className="h-20 flex items-center justify-between px-4 border-b border-[#3A5A40]">
+        <Link href="/dashboard" onClick={() => setCurrentView('default')} className="flex items-center space-x-2.5 text-xl font-semibold text-[#C4E8C9] hover:text-white transition-colors">
+          <Stethoscope className="w-8 h-8 text-[#C4E8C9]" /> {/* Ícone Stethoscope */} 
           <span>
             PréClin<span className="font-light">Conecta</span> {/* Texto com Conecta mais leve */}
           </span>
@@ -109,8 +109,8 @@ export default function Sidebar({
           }
 
           const commonClasses = `w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-150 ease-in-out group text-left`;
-          const activeClasses = 'bg-teal-600 text-white shadow-md';
-          const inactiveClasses = 'hover:bg-slate-700 hover:text-white text-slate-300';
+          const activeClasses = 'bg-[#3A5A40] text-white shadow-md';
+          const inactiveClasses = 'hover:bg-[#2E4A3B] hover:text-white text-slate-200';
 
           if (item.label === 'Novo Link') {
             return (
@@ -123,7 +123,7 @@ export default function Sidebar({
                 }}
                 className={`${commonClasses} ${isActive ? activeClasses : inactiveClasses}`}
               >
-                <item.icon className={`w-5 h-5 ${isActive ? '' : 'text-slate-300 group-hover:text-white'}`} />
+                <item.icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`} />
                 <span>{item.label}</span>
               </button>
             );
@@ -138,7 +138,7 @@ export default function Sidebar({
                 }}
                 className={`${commonClasses} ${isActive ? activeClasses : inactiveClasses}`}
               >
-                <item.icon className={`w-5 h-5 ${isActive ? '' : 'text-slate-300 group-hover:text-white'}`} />
+                <item.icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`} />
                 <span>{item.label}</span>
               </button>
             );
@@ -153,7 +153,7 @@ export default function Sidebar({
                 }}
                 className={`${commonClasses} ${isActive ? activeClasses : inactiveClasses}`}
               >
-                <item.icon className={`w-5 h-5 ${isActive ? '' : 'text-slate-300 group-hover:text-white'}`} />
+                <item.icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`} />
                 <span>{item.label}</span>
               </Link>
             );
@@ -163,13 +163,13 @@ export default function Sidebar({
       </nav>
 
       {/* Seção de Perfil do Usuário */}
-      <div className="mt-auto p-4 border-t border-slate-700">
+      <div className="mt-auto p-4 border-t border-[#3A5A40]">
         {authLoading ? (
           <div className="flex items-center space-x-3 p-2">
-            <div className="w-10 h-10 bg-slate-700 rounded-full animate-pulse"></div>
+            <div className="w-10 h-10 bg-[#2E4A3B] rounded-full animate-pulse"></div>
             <div className="flex-1 space-y-1">
-                <div className="w-3/4 h-4 bg-slate-700 rounded animate-pulse"></div>
-                <div className="w-1/2 h-3 bg-slate-700 rounded animate-pulse"></div>
+                <div className="w-3/4 h-4 bg-[#2E4A3B] rounded animate-pulse"></div>
+                <div className="w-1/2 h-3 bg-[#2E4A3B] rounded animate-pulse"></div>
             </div>
           </div>
         ) : user ? (
@@ -190,7 +190,7 @@ export default function Sidebar({
                 <p className="text-sm font-medium text-white truncate" title={user.user_metadata?.full_name || user.email}>
                   {user.user_metadata?.full_name || user.email}
                 </p>
-                <p className="text-xs text-slate-400 truncate" title={user.user_metadata?.specialty || 'Médico(a)'}>
+                <p className="text-xs text-slate-300 truncate" title={user.user_metadata?.specialty || 'Médico(a)'}>
                   {user.user_metadata?.specialty || 'Médico(a)'} {/* Assumindo que 'specialty' pode estar em user_metadata */}
                 </p>
               </div>
@@ -202,14 +202,14 @@ export default function Sidebar({
                 await handleSignOut();
                 if (isMobileMenuOpen) setIsMobileMenuOpen(false); // Fecha menu mobile ao sair
               }}
-              className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-left text-slate-300 hover:bg-red-600 hover:text-white transition-all duration-150 ease-in-out group focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-left text-slate-200 hover:bg-red-600 hover:text-white transition-all duration-150 ease-in-out group focus:outline-none focus:ring-2 focus:ring-red-500"
             >
-              <LogOut className="w-5 h-5 text-slate-400 group-hover:text-white" />
+              <LogOut className="w-5 h-5 text-slate-300 group-hover:text-white" />
               <span>Sair</span>
             </button>
           </div>
         ) : (
-          <p className="text-xs text-slate-500 text-center">Não autenticado</p>
+          <p className="text-xs text-slate-400 text-center">Não autenticado</p>
         )}
       </div>
     </aside>

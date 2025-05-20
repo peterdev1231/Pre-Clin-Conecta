@@ -1,16 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Search, RefreshCw, PlusCircle } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils"; 
+import React from 'react';
+import { Search, PlusCircle, ListFilter } from 'lucide-react';
 
 interface ResponsesHeaderProps {
   searchTerm: string;
@@ -25,6 +16,12 @@ interface ResponsesHeaderProps {
   recentStats?: { label: string; value: string | number; icon?: React.ReactNode }[];
 }
 
+const filterOptions = [
+  { value: 'Todos', label: 'Todos' },
+  { value: 'Lido', label: 'Lidas' },
+  { value: 'Não Lido', label: 'Não lidas' },
+];
+
 export default function ResponsesHeader({ 
   searchTerm,
   setSearchTerm,
@@ -38,82 +35,75 @@ export default function ResponsesHeader({
   recentStats = []
 }: ResponsesHeaderProps) {
   return (
-    <div data-testid="responses-header-main-div" className="z-10 sticky top-0 bg-gradient-to-b from-cinza-claro to-verde-menta/40 shadow-md p-6 rounded-b-xl mb-8">
-      <div className="container mx-auto px-0 sm:px-4">
-        {/* Título e subtítulo */}
-        <div className="flex flex-col gap-1 sm:gap-2 mb-6">
-          <h1 className="text-3xl sm:text-4xl font-bold text-verde-escuro">Respostas dos Pacientes</h1>
-          <h2 className="text-base sm:text-lg text-verde-escuro/80 font-medium">Área central para acompanhar, filtrar e gerenciar as respostas dos pacientes recebidas via formulários digitais.</h2>
+    <div className="mb-8 p-6 rounded-lg shadow-lg bg-gradient-to-r from-[#25392C] to-[#3A5A40] text-white">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Respostas dos Pacientes</h1>
+          <p className="text-slate-300 mt-1">
+            Área central para acompanhar, filtrar e gerenciar as respostas dos pacientes recebidas via formulários digitais.
+          </p>
         </div>
-        {/* Estatísticas rápidas */}
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="flex items-center gap-2 bg-verde-menta rounded-lg px-4 py-2 min-w-[120px] border border-verde-escuro/10">
-            <span className="font-bold text-lg text-verde-escuro">{totalCount}</span>
-            <span className="text-verde-escuro/80 text-sm">Total</span>
-          </div>
-          <div className="flex items-center gap-2 bg-verde-menta rounded-lg px-4 py-2 min-w-[120px] border border-verde-escuro/10">
-            <span className="font-bold text-lg text-yellow-700">{unreadCount}</span>
-            <span className="text-verde-escuro/80 text-sm">Não lidas</span>
-          </div>
-          <div className="flex items-center gap-2 bg-verde-menta rounded-lg px-4 py-2 min-w-[120px] border border-verde-escuro/10">
-            <span className="font-bold text-lg text-green-700">{readCount}</span>
-            <span className="text-verde-escuro/80 text-sm">Lidas</span>
-          </div>
-          {recentStats && recentStats.length > 0 && recentStats.map((stat, idx) => (
-            <div key={idx} className="flex items-center gap-2 bg-verde-menta/70 rounded-lg px-4 py-2 min-w-[120px] border border-verde-escuro/10">
-              {stat.icon && <span className="text-verde-escuro/80">{stat.icon}</span>}
-              <span className="font-bold text-lg text-verde-escuro">{stat.value}</span>
-              <span className="text-verde-escuro/80 text-sm">{stat.label}</span>
-            </div>
-          ))}
+        <button
+          onClick={onGenerateNewLink}
+          className="mt-4 md:mt-0 flex items-center bg-[#00A651] hover:bg-opacity-90 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-colors duration-150 ease-in-out"
+        >
+          <PlusCircle className="h-5 w-5 mr-2" />
+          Gerar Novo Link
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-slate-300">Total</h3>
+          <p className="text-2xl font-semibold">{totalCount}</p>
         </div>
-        {/* Busca, filtro e ações */}
-        <div className="flex flex-col md:flex-row md:items-end gap-4 mb-2">
-          <div className="flex-1 flex flex-col sm:flex-row gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-verde-escuro/60" />
-              <input
-                type="text"
-                placeholder="Buscar paciente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-verde-menta rounded-lg bg-white text-verde-escuro focus:ring-2 focus:ring-verde-escuro/30 shadow-sm hover:shadow-md transition-all duration-150 ease-in-out"
-              />
-            </div>
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={(value: 'Todos' | 'Lido' | 'Não Lido') => setStatusFilter(value)}>
-              <SelectTrigger className="w-full sm:w-[180px] border border-verde-menta rounded-lg bg-white text-verde-escuro focus:ring-2 focus:ring-verde-escuro/30 shadow-sm hover:shadow-md transition-all duration-150 ease-in-out">
-                <SelectValue placeholder="Filtrar por status" className="placeholder-verde-escuro/60" />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-verde-menta text-verde-escuro rounded-md shadow-lg">
-                <SelectItem value="Todos" className="hover:bg-verde-menta/60 focus:bg-verde-menta/80 cursor-pointer">Todos</SelectItem>
-                <SelectItem value="Não Lido" className="hover:bg-verde-menta/60 focus:bg-verde-menta/80 cursor-pointer">Não Lido</SelectItem>
-                <SelectItem value="Lido" className="hover:bg-verde-menta/60 focus:bg-verde-menta/80 cursor-pointer">Lido</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-slate-300">Não lidas</h3>
+          <p className="text-2xl font-semibold">{unreadCount}</p>
+        </div>
+        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-slate-300">Lidas</h3>
+          <p className="text-2xl font-semibold">{readCount}</p>
+        </div>
+        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-slate-300">Último paciente</h3>
+          <p className="text-lg font-semibold truncate">adadadadad</p>
+          <p className="text-xs text-slate-400">19/05/2025 Recebido em</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center gap-4">
+        <div className="relative flex-grow w-full sm:w-auto">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-slate-400" />
           </div>
-          <div className="flex gap-3">
-            {/* Botão de Atualizar */}
-            <Button 
-              onClick={onRefresh}
-              title="Atualizar dados"
-              variant="outline"
-              size="icon"
-              className="p-2.5 bg-verde-menta hover:bg-verde-menta/80 text-verde-escuro border border-verde-escuro/20 focus:ring-2 focus:ring-verde-escuro"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </Button>
-            {/* Botão de Gerar Novo Link */}
-            <Button 
-              onClick={onGenerateNewLink}
-              variant="default"
-              className="flex items-center gap-2 px-6 py-2.5 text-lg font-semibold bg-verde-escuro text-cinza-claro hover:bg-verde-escuro/90 focus:ring-offset-verde-menta shadow-lg border-2 border-verde-escuro/60"
-            >
-              <PlusCircle className="mr-2 w-6 h-6" />
-              <span>Gerar Novo Link</span>
-            </Button>
-          </div>
+          <input
+            type="text"
+            placeholder="Buscar paciente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white/20 border-slate-500 focus:ring-2 focus:ring-[#00A651] focus:border-[#00A651] placeholder-slate-400 text-white"
+          />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'Todos' | 'Lido' | 'Não Lido')}
+            className="flex-grow sm:flex-grow-0 w-full sm:w-auto bg-white/20 border border-slate-500 text-white py-2.5 pl-3 pr-8 rounded-lg focus:ring-2 focus:ring-[#00A651] focus:border-[#00A651] appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+          >
+            {filterOptions.map(option => (
+              <option key={option.value} value={option.value} className="bg-[#25392C] text-white">
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button
+            title="Configurações de Filtro"
+            className="p-2.5 bg-white/20 border border-slate-500 text-white rounded-lg hover:bg-white/30 focus:ring-2 focus:ring-[#00A651]"
+          >
+            <ListFilter className="h-5 w-5" />
+          </button>
         </div>
       </div>
     </div>

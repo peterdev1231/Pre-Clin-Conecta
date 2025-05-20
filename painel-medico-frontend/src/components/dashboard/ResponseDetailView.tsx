@@ -17,6 +17,8 @@ import {
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { PrinterIcon } from "lucide-react";
 
 // Definindo o tipo para os dados do formulário explicitamente
 // Isso deve espelhar a estrutura que você salva em 'dados_formulario'
@@ -57,13 +59,13 @@ const DetailCard: React.FC<{
   contentClassName?: string; // Para estilizar o padding/etc do conteúdo se necessário
 }> = ({ title, icon, children, className, contentClassName }) => (
   <div
-    className={`flex flex-col shadow-lg rounded-lg overflow-hidden bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 ${className || ""} flex-1 min-w-[300px] md:min-w-[320px]`}
+    className={`flex flex-col shadow-lg rounded-lg overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 ${className || ""} flex-1 min-w-[300px] md:min-w-[320px]`}
   >
-    <div className="flex items-center p-3 md:p-4 bg-emerald-50 dark:bg-emerald-700/20 border-b border-emerald-100 dark:border-emerald-600/30">
-      {icon && React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: "h-5 w-5 text-emerald-600 dark:text-emerald-400" })}
-      <h3 className="font-montserrat text-base md:text-lg font-semibold ml-2.5 text-emerald-700 dark:text-emerald-300">{title}</h3>
+    <div className="flex items-center p-3 md:p-4 bg-[#C4E8C9]/40 dark:bg-[#2E4A3B]/70 border-b border-emerald-200/50 dark:border-[#3A5A40]/60">
+      {icon && React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<{ className?: string }>, { className: "h-5 w-5 text-[#25392C] dark:text-[#C4E8C9]" })}
+      <h3 className="font-montserrat text-base md:text-lg font-semibold ml-2.5 text-[#25392C] dark:text-[#C4E8C9]">{title}</h3>
     </div>
-    <div className={`p-4 text-gray-700 dark:text-slate-300 space-y-2 text-sm flex-grow ${contentClassName || ""}`}> 
+    <div className={`p-4 text-slate-700 dark:text-slate-300 space-y-2 text-sm flex-grow ${contentClassName || ""}`}> 
       {children}
     </div>
   </div>
@@ -79,25 +81,26 @@ const FileListItem: React.FC<{
     const extension = nome_arquivo?.split('.').pop()?.toLowerCase();
     const mime = tipo_mime?.toLowerCase();
 
-    if (mime?.startsWith('image/')) return <ImageIcon size={18} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />;
+    // Usando as cores da paleta nova
+    if (mime?.startsWith('image/')) return <ImageIcon size={18} className="text-[#00A651] dark:text-[#00A651] flex-shrink-0" />;
     if (mime === 'application/pdf') return <FileText size={18} className="text-red-600 dark:text-red-400 flex-shrink-0" />;
     if (extension === 'doc' || extension === 'docx') return <FileText size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />;
     if (extension === 'zip' || extension === 'rar') return <FileArchive size={18} className="text-yellow-600 dark:text-yellow-400 flex-shrink-0" />;
     
-    if (tipo_mime) return <FileQuestion size={18} className="text-gray-500 dark:text-gray-400 flex-shrink-0" />;
-    return <Paperclip size={18} className="text-gray-500 dark:text-gray-400 flex-shrink-0" />;
+    if (tipo_mime) return <FileQuestion size={18} className="text-slate-500 dark:text-slate-400 flex-shrink-0" />;
+    return <Paperclip size={18} className="text-slate-500 dark:text-slate-400 flex-shrink-0" />;
   };
 
   return (
-    <div className="flex items-center justify-between p-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-600 hover:dark:bg-slate-500 transition-colors rounded-md">
+    <div className="flex items-center justify-between p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700/60 hover:dark:bg-slate-600/70 transition-colors rounded-md">
       <div className="flex items-center truncate">
         {getFileIcon()} 
-        <span className="ml-2 text-sm text-gray-600 dark:text-slate-200 truncate" title={nome_arquivo}>{nome_arquivo}</span>
+        <span className="ml-2 text-sm text-slate-600 dark:text-slate-200 truncate" title={nome_arquivo}>{nome_arquivo}</span>
       </div>
       {signedUrl ? (
         <button
           onClick={() => onViewClick(file)}
-          className="ml-3 px-3 py-1 text-xs bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-300 shadow-sm hover:shadow-md"
+          className="ml-3 px-3 py-1 text-xs bg-[#00A651] hover:bg-[#008f48] text-white rounded-md font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-300 dark:focus:ring-offset-slate-800 shadow-sm hover:shadow-md"
         >
           Ver
         </button>
@@ -206,10 +209,10 @@ export default function ResponseDetailView({
   return (
     <div className="space-y-6 md:space-y-8">
       <div className="mb-8">
-        <h2 className="font-montserrat text-2xl md:text-3xl font-bold text-gray-700 dark:text-slate-100">
+        <h2 className="font-montserrat text-2xl md:text-3xl font-bold text-[#25392C] dark:text-slate-100">
           {dadosFormulario.nomePaciente || "Paciente Anônimo"}
         </h2>
-        <p className="text-base text-gray-500 dark:text-slate-400 mt-1.5 font-sans">
+        <p className="text-base text-slate-500 dark:text-slate-400 mt-1.5 font-sans">
           Resposta recebida em: {response.criado_em ? new Date(response.criado_em).toLocaleString("pt-BR", { dateStyle: "long", timeStyle: "short" }) : "Data não disponível"}
         </p>
       </div>
@@ -269,24 +272,28 @@ export default function ResponseDetailView({
       </div>
       
       <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-6 mt-4">
-        <button 
+        <Button
+          variant="outline"
+          className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-500"
           onClick={() => window.print()}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-slate-600 dark:hover:bg-slate-500 dark:text-slate-200 transition-colors flex items-center justify-center shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-400"
-          >
-          <FileText size={16} className="mr-2"/>
+        >
+          <PrinterIcon className="mr-2 h-4 w-4" />
           Imprimir
-        </button>
-        <button 
-          onClick={handleToggleReadStatus} 
-          className={`w-full sm:w-auto px-5 py-2.5 rounded-md font-semibold text-sm transition-colors flex items-center justify-center shadow-sm hover:shadow-md focus:outline-none focus:ring-2 
-                      ${response.revisado_pelo_profissional 
-                          ? 'bg-amber-500 hover:bg-amber-600 text-white focus:ring-amber-300 dark:focus:ring-amber-400' 
-                          : 'bg-emerald-500 hover:bg-emerald-600 text-white focus:ring-emerald-300 dark:focus:ring-emerald-400'}
-                      disabled:opacity-60 disabled:cursor-not-allowed`}
-          >
-          {response.revisado_pelo_profissional ? <XCircle size={18} className="mr-2"/> : <CheckCircle2 size={18} className="mr-2"/>}
-          {response.revisado_pelo_profissional ? "Marcar como Não Lido" : "Marcar como Lido"}
-        </button>
+        </Button>
+        <Button
+          onClick={handleToggleReadStatus}
+          className={`w-full sm:w-auto text-white transition-colors duration-150 ease-in-out 
+            ${response.revisado_pelo_profissional 
+              ? 'bg-amber-500 hover:bg-amber-600 focus-visible:ring-amber-400' 
+              : 'bg-[#00A651] hover:bg-[#008f48] focus-visible:ring-green-400'}
+          `}
+        >
+          {response.revisado_pelo_profissional ? (
+            <><XCircle className="mr-2 h-4 w-4" /> Marcar como Não Lido</>
+          ) : (
+            <><CheckCircle2 className="mr-2 h-4 w-4" /> Marcar como Lido</>
+          )}
+        </Button>
       </div>
 
       {/* Modal para Visualização de Imagem */}

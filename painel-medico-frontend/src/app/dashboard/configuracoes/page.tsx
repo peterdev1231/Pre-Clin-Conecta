@@ -202,7 +202,7 @@ export default function ConfiguracoesPage() {
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-10">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100 sm:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight text-[#25392C] dark:text-slate-100 sm:text-4xl">
           Configurações da Conta
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
@@ -211,11 +211,11 @@ export default function ConfiguracoesPage() {
       </header>
 
       {/* Profile Information Card */}
-      <section aria-labelledby="profile-info-heading" className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden">
+      <section aria-labelledby="profile-info-heading" className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
         <div className="p-6 sm:p-8">
           <div className="flex items-center justify-between">
-            <h2 id="profile-info-heading" className="text-xl font-semibold text-slate-700 dark:text-slate-200 flex items-center">
-              <UserCircle2 className="w-7 h-7 mr-3 text-teal-500" />
+            <h2 id="profile-info-heading" className="text-xl font-semibold text-[#25392C] dark:text-slate-200 flex items-center">
+              <UserCircle2 className="w-7 h-7 mr-3 text-[#00A651]" />
               Informações do Perfil
             </h2>
           </div>
@@ -248,65 +248,64 @@ export default function ConfiguracoesPage() {
                 <input type="file" ref={fileInputRef} onChange={handlePhotoSelect} accept="image/jpeg, image/png, image/webp" className="hidden" />
               </div>
               {photoPreview && profilePhotoFile && (
-                <div className="flex flex-col items-center space-y-2 w-full">
-                    <Button onClick={handlePhotoUpload} disabled={loadingPhoto} className="w-full bg-teal-600 hover:bg-teal-700">
-                    {loadingPhoto ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
-                    Salvar Nova Foto
-                    </Button>
-                    <Button variant="ghost" onClick={() => { setPhotoPreview(null); setProfilePhotoFile(null); if(fileInputRef.current) fileInputRef.current.value = ''; }} disabled={loadingPhoto} className="w-full text-slate-600 dark:text-slate-400">
-                        Cancelar
-                    </Button>
+                <div className="flex space-x-3 w-full">
+                  <Button onClick={handlePhotoUpload} disabled={loadingPhoto} className="flex-1 bg-[#00A651] hover:bg-[#008f48] text-white">
+                    {loadingPhoto ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Salvar Foto
+                  </Button>
+                  <Button variant="outline" onClick={() => { setProfilePhotoFile(null); setPhotoPreview(null); }} disabled={loadingPhoto} className="text-[#25392C] border-[#25392C]/70 hover:bg-[#C4E8C9]/30 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-700">
+                    <X className="mr-2 h-4 w-4" /> Cancelar
+                  </Button>
                 </div>
               )}
             </div>
 
             {/* Name and Email Section */}
             <div className="md:col-span-2 space-y-6">
+              {/* Full Name */}
               <div>
-                <Label htmlFor="fullName" className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center mb-1">
-                  <User className="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400" /> Nome Completo
-                </Label>
+                <Label htmlFor="fullName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome Completo</Label>
                 {isEditingName ? (
-                  <form onSubmit={handleNameChangeSubmit} className="flex items-center gap-2">
+                  <form onSubmit={handleNameChangeSubmit} className="flex items-center space-x-2">
                     <Input
                       id="fullName"
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="flex-grow bg-slate-50 dark:bg-slate-700 border-slate-300 dark:border-slate-600"
-                      autoFocus
+                      className="block w-full rounded-md border-slate-300 bg-white dark:border-slate-600 shadow-sm focus:border-[#00A651] focus:ring-[#00A651]/50 dark:focus:border-[#00A651] dark:focus:ring-[#00A651]/50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 sm:text-sm placeholder-slate-400 dark:placeholder-slate-500"
+                      placeholder="Seu nome completo"
                     />
-                    <Button type="submit" size="icon" variant="ghost" className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400" disabled={loadingName} aria-label="Salvar nome">
+                    <Button type="submit" disabled={loadingName} className="bg-[#00A651] hover:bg-[#008f48] text-white p-2">
                       {loadingName ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                     </Button>
-                    <Button type="button" size="icon" variant="ghost" onClick={handleCancelEditName} className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" disabled={loadingName} aria-label="Cancelar edição do nome">
+                    <Button type="button" variant="outline" onClick={handleCancelEditName} disabled={loadingName} className="text-[#25392C] border-[#25392C]/70 hover:bg-[#C4E8C9]/30 dark:text-slate-300 dark:border-slate-500 dark:hover:bg-slate-700 p-2">
                       <X className="h-5 w-5" />
                     </Button>
                   </form>
                 ) : (
-                  <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-700/50 rounded-lg min-h-[40px]">
-                    <span className="text-slate-800 dark:text-slate-100">{fullName}</span>
-                    <Button onClick={handleEditName} size="icon" variant="ghost" className="text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-500" aria-label="Editar nome">
+                  <div className="flex items-center justify-between p-3 rounded-md bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600/70">
+                    <p className="text-sm text-slate-900 dark:text-slate-100">{fullName}</p>
+                    <button onClick={handleEditName} className="p-1.5 text-slate-500 hover:text-[#00A651] dark:text-slate-400 dark:hover:text-[#00A651] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00A651]/50">
                       <Edit3 className="w-4 h-4" />
-                    </Button>
+                      <span className="sr-only">Editar nome</span>
+                    </button>
                   </div>
                 )}
               </div>
-
+              {/* Email */}
               <div>
-                <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center mb-1">
-                  <Mail className="w-4 h-4 mr-2 text-slate-500 dark:text-slate-400" /> Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  readOnly
-                  className="bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600 cursor-not-allowed"
-                />
-                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  O email não pode ser alterado através desta página.
-                </p>
+                <Label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</Label>
+                <div className="relative">
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    readOnly
+                    disabled
+                    className="block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 sm:text-sm placeholder-slate-400 dark:placeholder-slate-500 cursor-not-allowed pl-10"
+                  />
+                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500" />
+                </div>
+                
               </div>
             </div>
           </div>
@@ -314,63 +313,48 @@ export default function ConfiguracoesPage() {
       </section>
 
       {/* Change Password Card */}
-      <section aria-labelledby="password-change-heading" className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden">
+      <section aria-labelledby="password-heading" className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
         <div className="p-6 sm:p-8">
-          <h2 id="password-change-heading" className="text-xl font-semibold text-slate-700 dark:text-slate-200 flex items-center">
-            <ShieldCheck className="w-7 h-7 mr-3 text-teal-500" />
+          <h2 id="password-heading" className="text-xl font-semibold text-[#25392C] dark:text-slate-200 flex items-center">
+            <ShieldCheck className="w-7 h-7 mr-3 text-[#00A651]" />
             Alterar Senha
           </h2>
           <form onSubmit={handlePasswordChange} className="mt-6 space-y-6">
-            <div>
-              <Label htmlFor="newPassword">Nova Senha (mínimo 6 caracteres)</Label>
-              <div className="relative mt-1">
-                <Input 
-                  id="newPassword" 
-                  type={showNewPassword ? "text" : "password"} 
+            <div className="space-y-1">
+              <Label htmlFor="newPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nova Senha</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-700 border-slate-300 dark:border-slate-600 pr-10"
+                  className="block w-full rounded-md border-slate-300 bg-white dark:border-slate-600 shadow-sm focus:border-[#00A651] focus:ring-[#00A651]/50 dark:focus:border-[#00A651] dark:focus:ring-[#00A651]/50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 sm:text-sm placeholder-slate-400 dark:placeholder-slate-500 pr-10"
                   placeholder="••••••••"
                 />
-                <Button 
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-500"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  aria-label={showNewPassword ? "Esconder senha" : "Mostrar senha"}
-                >
+                <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-slate-500 hover:text-[#00A651] dark:text-slate-400 dark:hover:text-[#00A651]">
                   {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </Button>
+                </button>
               </div>
             </div>
-            <div>
-              <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
-              <div className="relative mt-1">
-                <Input 
-                  id="confirmPassword" 
-                  type={showConfirmPassword ? "text" : "password"} 
+            <div className="space-y-1">
+              <Label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Confirmar Nova Senha</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="bg-slate-50 dark:bg-slate-700 border-slate-300 dark:border-slate-600 pr-10"
+                  className="block w-full rounded-md border-slate-300 bg-white dark:border-slate-600 shadow-sm focus:border-[#00A651] focus:ring-[#00A651]/50 dark:focus:border-[#00A651] dark:focus:ring-[#00A651]/50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 sm:text-sm placeholder-slate-400 dark:placeholder-slate-500 pr-10"
                   placeholder="••••••••"
                 />
-                <Button 
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-500"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  aria-label={showConfirmPassword ? "Esconder senha" : "Mostrar senha"}
-                >
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-slate-500 hover:text-[#00A651] dark:text-slate-400 dark:hover:text-[#00A651]">
                   {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </Button>
+                </button>
               </div>
             </div>
-            <Button type="submit" className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 flex items-center justify-center" disabled={loadingPassword}>
-              {loadingPassword ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Alterando...</>
-              ) : 'Alterar Senha'}
+            <Button type="submit" disabled={loadingPassword} className="w-full sm:w-auto bg-[#00A651] hover:bg-[#008f48] text-white">
+              {loadingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4"/>}
+              Salvar Nova Senha
             </Button>
           </form>
         </div>

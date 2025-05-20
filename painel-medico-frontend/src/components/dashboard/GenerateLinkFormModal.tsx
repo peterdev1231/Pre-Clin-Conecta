@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { Copy, Check, AlertTriangle, Loader2, Link as LinkIcon, Info } from 'lucide-react';
+import { Copy, Check, AlertTriangle, Loader2, Link as LinkIcon, Info, X as XIcon } from 'lucide-react';
 import { toast } from "sonner"; // Usaremos sonner para notificações
 
 interface GenerateLinkFormModalProps {
@@ -115,50 +115,61 @@ export default function GenerateLinkFormModal({ isOpen, onClose }: GenerateLinkF
   }, [isOpen]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open: boolean) => !open && onClose()}>
-      <DialogContent className="bg-gradient-to-br from-[#F5F7FA] to-[#E0EAF2] dark:bg-slate-900 rounded-xl shadow-xl p-0 sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] flex flex-col">
-        <DialogHeader className="text-center p-6 sm:p-8 pb-4 sm:pb-6 border-b border-slate-300 dark:border-slate-700 flex-shrink-0">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="bg-gradient-to-r from-[#1B3B2E] to-[#CCD5DE] text-slate-100 rounded-xl shadow-xl p-0 sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+        <DialogHeader className="relative text-center p-6 sm:p-8 pb-4 sm:pb-6 border-b border-[#3A5A40]/70 flex-shrink-0">
+          <button 
+            type="button"
+            aria-label="Fechar"
+            onClick={onClose}
+            className="absolute top-5 right-5 sm:top-6 sm:right-6 p-1.5 rounded-full text-white bg-[#25392C] hover:bg-[#1B3B2E] transition-colors focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-[#1B3B2E] z-30"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
           <div className="flex items-center justify-center mb-2">
-            <LinkIcon className="h-6 w-6 mr-2 text-emerald-600 dark:text-emerald-400" />
-            <DialogTitle className="font-montserrat text-xl font-semibold text-slate-700 dark:text-slate-100 tracking-tight">
+            <LinkIcon className="h-6 w-6 mr-2 text-[#00A651]" />
+            <DialogTitle className="font-montserrat text-xl font-semibold text-slate-50 tracking-tight">
               Gerar Novo Link
             </DialogTitle>
           </div>
-          <DialogDescription className="text-sm text-slate-600 dark:text-slate-400 tracking-wide mx-auto max-w-xs sm:max-w-sm">
+          <DialogDescription className="text-sm text-slate-200 tracking-wide mx-auto max-w-xs sm:max-w-sm text-center">
             Crie um link seguro e exclusivo para o paciente preencher o formulário de pré-consulta.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-grow overflow-y-auto p-6 sm:p-8 space-y-6">
           {error && !generatedLink && (
-            <div className="p-3 bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-600 text-red-700 dark:text-red-300 rounded-lg flex items-center text-sm tracking-wide">
+            <div className="p-3 bg-red-500/30 border border-red-400/50 text-white rounded-lg flex items-center text-sm tracking-wide">
               <AlertTriangle className="h-5 w-5 mr-2.5 flex-shrink-0" />
               <p>{error}</p>
             </div>
           )}
 
           {generatedLink && (
-            <div className="p-4 border border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900/40 rounded-lg shadow-md">
+            <div className="p-4 border border-green-400/50 bg-green-500/30 text-white rounded-lg shadow-md">
               <div className="flex items-center mb-3">
-                <Check className="h-6 w-6 mr-2 text-green-600 dark:text-green-400 flex-shrink-0" />
-                <p className="text-md font-semibold text-green-700 dark:text-green-300 tracking-wide">Link gerado com sucesso!</p>
+                <Check className="h-6 w-6 mr-2 text-white flex-shrink-0" />
+                <p className="text-md font-semibold tracking-wide">Link gerado com sucesso!</p>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 tracking-wide">
+              <p className="text-xs text-slate-200 mb-3 tracking-wide">
                 Copie o link abaixo e compartilhe com o paciente.
               </p>
-              <div className="flex items-center space-x-2 p-2.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-emerald-500 dark:focus-within:ring-emerald-400 focus-within:ring-offset-white dark:focus-within:ring-offset-slate-900 transition-all duration-150">
+              <div className="flex items-center space-x-2 p-2.5 bg-slate-700/60 border border-slate-500/70 rounded-md focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-[#00A651]/70 dark:focus-within:ring-[#00A651] focus-within:ring-offset-[#1B3B2E] transition-all duration-150">
                 <Input
                   id="generatedLinkInput"
                   value={generatedLink}
                   readOnly
-                  className="flex-1 text-sm bg-transparent border-none focus:ring-0 focus:outline-none dark:text-slate-200 tracking-wide"
+                  className="flex-1 text-sm bg-transparent border-none focus:ring-0 focus:outline-none text-slate-100 tracking-wide"
                 />
                 <Button
                   type="button"
                   size="sm"
                   onClick={handleCopyToClipboard}
-                  variant={isCopied ? "default" : "secondary"}
-                  className={`transition-all duration-150 ease-in-out text-sm tracking-wide px-3 py-1.5 font-medium ${isCopied ? 'bg-green-500 hover:bg-green-600 text-white dark:bg-green-500 dark:hover:bg-green-600' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200'}`}
+                  variant="ghost" // Usar ghost para não ter fundo próprio, apenas o da classe
+                  className={`transition-all duration-150 ease-in-out text-sm tracking-wide px-3 py-1.5 font-medium rounded-md 
+                    ${isCopied 
+                      ? 'bg-[#00A651] hover:bg-green-700 text-white' 
+                      : 'bg-slate-600/80 hover:bg-slate-500/80 text-slate-100'}`}
                 >
                   {isCopied ? <Check className="h-4 w-4 mr-1.5 flex-shrink-0" /> : <Copy className="h-4 w-4 mr-1.5 flex-shrink-0" />}
                   {isCopied ? 'Copiado!' : 'Copiar'}
@@ -168,16 +179,16 @@ export default function GenerateLinkFormModal({ isOpen, onClose }: GenerateLinkF
           )}
 
           {!generatedLink && (
-            <div className="text-center">
-              <p className="text-sm text-slate-500 dark:text-slate-400 tracking-wide">
+            <div className="text-center p-4 rounded-lg bg-[#25392C]/80 border border-[#3A5A40]/80">
+              <p className="text-sm text-slate-100 tracking-wide">
                 O link será válido por 7 dias após a criação.
               </p>
             </div>
           )}
         </div>
         
-        <DialogFooter className="flex flex-col sm:flex-row sm:justify-between items-center p-6 sm:p-8 pt-4 sm:pt-6 border-t border-slate-300 dark:border-slate-700 flex-shrink-0">
-          <div className="flex items-center text-xs text-slate-500 dark:text-slate-400 tracking-wide text-center sm:text-left mb-4 sm:mb-0">
+        <DialogFooter className="flex flex-col sm:flex-row sm:justify-between items-center p-6 sm:p-8 pt-4 sm:pt-6 border-t border-[#3A5A40]/70 flex-shrink-0">
+          <div className="flex items-center text-xs text-slate-200 tracking-wide text-center sm:text-left mb-4 sm:mb-0">
             <Info className="h-4 w-4 mr-1.5 flex-shrink-0 hidden sm:inline" />
             <span>Link válido por 7 dias.</span>
           </div>
@@ -185,8 +196,7 @@ export default function GenerateLinkFormModal({ isOpen, onClose }: GenerateLinkF
             <DialogClose asChild>
               <Button
                 type="button"
-                variant="outline"
-                className="w-full sm:w-auto text-sm tracking-wide font-medium text-slate-600 dark:text-slate-300 border-slate-400 dark:border-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500"
+                className="w-full sm:w-auto text-sm tracking-wide font-medium rounded-md text-slate-200 border border-slate-400/80 hover:border-slate-300/90 bg-slate-600/50 hover:bg-slate-500/60 focus-visible:ring-2 focus-visible:ring-slate-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1B3B2E]"
                 onClick={() => { if (generatedLink) onClose(); }}
               >
                 {generatedLink ? 'Fechar' : 'Cancelar'}
@@ -197,7 +207,7 @@ export default function GenerateLinkFormModal({ isOpen, onClose }: GenerateLinkF
                 type="button"
                 onClick={handleGenerateLink}
                 disabled={isLoading}
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white text-sm tracking-wide font-semibold shadow-md hover:shadow-lg transition-all duration-150 ease-in-out"
+                className="w-full sm:w-auto bg-[#00A651] hover:bg-[#008f48] text-white text-sm tracking-wide font-semibold shadow-md hover:shadow-lg transition-all duration-150 ease-in-out rounded-md"
               >
                 {isLoading ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" /> Gerando...</>
