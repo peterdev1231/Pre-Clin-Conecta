@@ -84,8 +84,18 @@ export default function ResponsesHeader({
         </div>
         <div className="bg-white/10 backdrop-blur-sm p-4 rounded-lg shadow">
           <h3 className="text-sm font-medium text-slate-300">Último paciente</h3>
-          <p className="text-lg font-semibold truncate">adadadadad</p>
-          <p className="text-xs text-slate-400">19/05/2025 Recebido em</p>
+          {recentStats && recentStats.length > 0 && recentStats.find(stat => stat.label === 'Último paciente') ? (
+            <>
+              <p className="text-lg font-semibold truncate">{recentStats.find(stat => stat.label === 'Último paciente')?.value || 'N/A'}</p>
+              {recentStats.find(stat => stat.label === 'Recebido em') && (
+                <p className="text-xs text-slate-400">
+                  {recentStats.find(stat => stat.label === 'Recebido em')?.value} Recebido em
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-lg font-semibold truncate">Nenhum</p>
+          )}
         </div>
       </div>
 
