@@ -66,9 +66,9 @@ export default function StatisticsOverview() {
     try {
       // 1. Get profissional_id from user_id
       const { data: profissionalData, error: profissionalError } = await supabase
-        .from('profissionais_saude')
+        .from('perfis_profissionais')
         .select('id')
-        .eq('id_usuario_supabase', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (profissionalError) throw new Error(`Erro ao buscar perfil profissional: ${profissionalError.message}`);
