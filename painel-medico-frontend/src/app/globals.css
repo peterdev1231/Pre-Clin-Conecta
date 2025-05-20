@@ -145,3 +145,30 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--foreground) / 0.5);
 }
+
+/* Ocultar o botão de fechar padrão do DialogContent para modais específicos */
+/* Seletor anterior que não funcionou como esperado:
+.custom-generate-link-modal > button[cmdk-dialog-default-close] {
+  display: none !important;
+}
+*/
+
+/* 
+  Novo seletor para ocultar o botão X padrão do DialogContent.
+  O DialogPrimitive.Close de shadcn/ui tem as classes 'absolute', 'right-4', 'top-4' por padrão.
+*/
+.custom-generate-link-modal > button.absolute.right-4.top-4:not([data-slot="dialog-close"]) {
+  display: none !important;
+}
+
+/* 
+  Adicionei :not([data-slot="dialog-close"]) para garantir que não oculte acidentalmente
+  o seu botão customizado se ele, por ventura, corresponder às outras classes,
+  embora seja improvável dado que seu botão tem right-5/top-5.
+  Se o seletor acima não funcionar, inspecione o elemento X padrão no navegador 
+  e use um seletor mais específico baseado nas classes dele. Por exemplo:
+
+  .custom-generate-link-modal > button.absolute.right-4.top-4 {
+    display: none !important;
+  }
+*/

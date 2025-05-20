@@ -114,6 +114,8 @@ export default function FormularioPage() {
 
   // pageState === 'valid' (formulário a ser exibido)
   return (
-    <PatientFormStepper linkId={linkId} onFormSubmitSuccess={handleFormSubmissionSuccess} />
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#25392C] p-4">
+      <PatientFormStepper linkId={linkId} onFormSubmitSuccess={handleFormSubmissionSuccess} />
+    </div>
   );
 } 

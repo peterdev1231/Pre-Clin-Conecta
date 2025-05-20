@@ -5,6 +5,7 @@ import ResponsesHeader from './ResponsesHeader';
 import ResponsesTable, { PacienteResponse } from './ResponsesTable';
 import GenerateLinkFormModal from './GenerateLinkFormModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { startOfDay, endOfDay, subDays } from 'date-fns';
 
 // Interface para os dados brutos do Supabase que serão buscados
 interface FetchedResponseData {
@@ -12,6 +13,7 @@ interface FetchedResponseData {
   nome_paciente: string; 
   data_envio: string | null; // data_envio pode ser null conforme database.types.ts
   revisado_pelo_profissional: boolean | null; // Corrigido de 'lido' e pode ser null
+  code?: string;
 }
 
 // Interface para erros que podem vir do Supabase com mais detalhes
@@ -29,6 +31,9 @@ export default function PatientResponsesView() {
   const [error, setError] = useState<Error | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Lido' | 'Não Lido'>('Todos');
+  
+  const [quickPeriod, setQuickPeriod] = useState<string | undefined>(undefined);
+
   const [isGenerateLinkModalOpen, setIsGenerateLinkModalOpen] = useState(false);
 
   // Cálculo dos contadores
@@ -55,7 +60,7 @@ export default function PatientResponsesView() {
   }
 
   const fetchResponses = useCallback(async () => {
-    console.log("[PatientResponsesView] fetchResponses called. User:", user?.id, "SearchTerm:", searchTerm, "StatusFilter:", statusFilter);
+    console.log("[PatientResponsesView] fetchResponses called. User:", user?.id, "SearchTerm:", searchTerm, "StatusFilter:", statusFilter, "QuickPeriod:", quickPeriod);
     if (!user) {
       console.log("[PatientResponsesView] No user, aborting fetch.");
       setIsLoading(false);
@@ -112,6 +117,34 @@ export default function PatientResponsesView() {
         .select('id, nome_paciente, data_envio, revisado_pelo_profissional') 
         .in('link_formulario_id', linkIds);
 
+      // Aplicar filtro de data se quickPeriod estiver definido
+      let effectiveFrom: Date | undefined;
+      let effectiveTo: Date | undefined;
+
+      if (quickPeriod) {
+        const now = new Date();
+        if (quickPeriod === 'hoje') {
+          effectiveFrom = startOfDay(now);
+          effectiveTo = endOfDay(now);
+        } else if (quickPeriod === 'ontem') {
+          const yesterday = subDays(now, 1);
+          effectiveFrom = startOfDay(yesterday);
+          effectiveTo = endOfDay(yesterday);
+        } else if (quickPeriod === 'ultimos7dias') {
+          effectiveFrom = startOfDay(subDays(now, 6));
+          effectiveTo = endOfDay(now);
+        } else if (quickPeriod === 'ultimos30dias') {
+          effectiveFrom = startOfDay(subDays(now, 29));
+          effectiveTo = endOfDay(now);
+        }
+      }
+
+      if (effectiveFrom && effectiveTo) {
+        console.log(`[PatientResponsesView] Applying date filter: FROM ${effectiveFrom.toISOString()} TO ${effectiveTo.toISOString()}`);
+        query = query.gte('data_envio', effectiveFrom.toISOString());
+        query = query.lte('data_envio', effectiveTo.toISOString());
+      }
+
       query = query.order('data_envio', { ascending: false, nullsFirst: false });
 
       const { data: respostasData, error: respostasError } = await query;
@@ -163,7 +196,7 @@ export default function PatientResponsesView() {
       console.log("[PatientResponsesView] fetchResponses finally block. isLoading should be false.");
       setIsLoading(false);
     }
-  }, [user, searchTerm, supabase, statusFilter]);
+  }, [user, searchTerm, supabase, statusFilter, quickPeriod]);
 
   useEffect(() => {
     console.log("[PatientResponsesView] useEffect for fetchResponses triggered.");
@@ -191,6 +224,8 @@ export default function PatientResponsesView() {
         unreadCount={unreadCount}
         readCount={readCount}
         recentStats={recentStats}
+        quickPeriod={quickPeriod}
+        setQuickPeriod={setQuickPeriod}
       />
       <div className="bg-white dark:bg-slate-800 shadow-lg rounded-xl p-6 md:p-8">
         <ResponsesTable 

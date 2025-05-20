@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ArrowLeft, CheckCircle, FileText, HeartPulse, ImageIcon, ListChecks, Pill, ShieldAlert, User, XCircle, UploadCloud } from 'lucide-react';
 import Step1Name from './Step1Name';
@@ -59,6 +59,21 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
     { title: 'Exames (Opcional)', icon: <FileText className="w-5 h-5" /> },
     { title: 'Revisão', icon: <ListChecks className="w-5 h-5" /> },
   ];
+
+  // Criar refs para cada elemento de step
+  const stepRefs = useRef<Array<React.RefObject<HTMLDivElement>>>(steps.map(() => React.createRef<HTMLDivElement>()));
+
+  // Efeito para scrollar o step ativo para a visão
+  useEffect(() => {
+    const activeStepRef = stepRefs.current[currentStep - 1];
+    if (activeStepRef && activeStepRef.current) {
+      activeStepRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  }, [currentStep]);
 
   const handleChange = (input: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
@@ -227,12 +242,12 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
   const examesParaRevisao = Object.values(fileUploads).filter(f => f.tipoDocumento === 'exame');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-700 to-emerald-900 flex flex-col items-center justify-center p-4 selection:bg-emerald-400 selection:text-white">
+    <div className="selection:bg-emerald-400 selection:text-white w-full flex justify-center">
       <div className="bg-white p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">Formulário do Paciente</h1>
           <p className="text-center text-gray-500 mb-6">Por favor, preencha as informações abaixo com atenção.</p>
-          <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center mb-2 px-1 overflow-x-auto pb-2 gap-x-4 sm:gap-x-6">
             {steps.map((step, index) => {
               const isActive = index + 1 === currentStep;
               const isCompleted = index + 1 < currentStep;
@@ -254,7 +269,7 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
               }
 
               return (
-                <React.Fragment key={index}>
+                <div key={index} ref={stepRefs.current[index]} className="flex items-center">
                   <div className={`flex flex-col items-center ${textColorClass}`}>
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${borderColorClass} ${bgColorClass}`}
@@ -269,7 +284,7 @@ const PatientFormStepper: React.FC<PatientFormStepperProps> = ({ linkId, onFormS
                     <div className={`flex-1 h-1 mx-2 rounded
                                        ${isCompleted ? 'bg-emerald-600' : (isActive ? 'bg-emerald-500' : 'bg-gray-300')}`} />
                   )}
-                </React.Fragment>
+                </div>
               );
             })}
           </div>

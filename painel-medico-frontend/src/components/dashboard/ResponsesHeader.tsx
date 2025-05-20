@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Search, PlusCircle, ListFilter } from 'lucide-react';
+import { Search, PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface ResponsesHeaderProps {
   searchTerm: string;
@@ -13,6 +15,8 @@ interface ResponsesHeaderProps {
   totalCount?: number;
   unreadCount?: number;
   readCount?: number;
+  quickPeriod?: string;
+  setQuickPeriod: (period: string | undefined) => void;
   recentStats?: { label: string; value: string | number; icon?: React.ReactNode }[];
 }
 
@@ -32,8 +36,21 @@ export default function ResponsesHeader({
   totalCount = 0,
   unreadCount = 0,
   readCount = 0,
+  quickPeriod,
+  setQuickPeriod,
   recentStats = []
 }: ResponsesHeaderProps) {
+  const quickPeriods = [
+    { key: 'hoje', label: 'Hoje' },
+    { key: 'ontem', label: 'Ontem' },
+    { key: 'ultimos7dias', label: 'Últimos 7 dias' },
+    { key: 'ultimos30dias', label: 'Últimos 30 dias' },
+  ];
+
+  const handleQuickPeriodSelect = (periodKey: string) => {
+    setQuickPeriod(periodKey);
+  };
+
   return (
     <div className="mb-8 p-6 rounded-lg shadow-lg bg-gradient-to-r from-[#25392C] to-[#3A5A40] text-white">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
@@ -72,38 +89,66 @@ export default function ResponsesHeader({
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-4">
-        <div className="relative flex-grow w-full sm:w-auto">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-slate-400" />
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-grow w-full sm:w-auto">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-slate-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar paciente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white/20 border-slate-500 focus:ring-2 focus:ring-[#00A651] focus:border-[#00A651] placeholder-slate-400 text-white"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Buscar paciente..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white/20 border-slate-500 focus:ring-2 focus:ring-[#00A651] focus:border-[#00A651] placeholder-slate-400 text-white"
-          />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'Todos' | 'Lido' | 'Não Lido')}
+              className="flex-grow sm:flex-grow-0 w-full sm:w-auto bg-white/20 border border-slate-500 text-white py-2.5 pl-3 pr-8 rounded-lg focus:ring-2 focus:ring-[#00A651] focus:border-[#00A651] appearance-none"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+            >
+              {filterOptions.map(option => (
+                <option key={option.value} value={option.value} className="bg-[#25392C] text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'Todos' | 'Lido' | 'Não Lido')}
-            className="flex-grow sm:flex-grow-0 w-full sm:w-auto bg-white/20 border border-slate-500 text-white py-2.5 pl-3 pr-8 rounded-lg focus:ring-2 focus:ring-[#00A651] focus:border-[#00A651] appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
-          >
-            {filterOptions.map(option => (
-              <option key={option.value} value={option.value} className="bg-[#25392C] text-white">
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <button
-            title="Configurações de Filtro"
-            className="p-2.5 bg-white/20 border border-slate-500 text-white rounded-lg hover:bg-white/30 focus:ring-2 focus:ring-[#00A651]"
-          >
-            <ListFilter className="h-5 w-5" />
-          </button>
+        
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          {quickPeriods.map((period) => (
+            <Button
+              key={period.key}
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuickPeriodSelect(period.key)}
+              className={cn(
+                "font-normal transition-colors",
+                quickPeriod === period.key
+                  ? "bg-[#00A651] text-white hover:bg-[#008f48] border-[#00A651]"
+                  : "bg-white/20 text-slate-300 hover:bg-white/30 border-slate-500 hover:text-white"
+              )}
+            >
+              {period.label}
+            </Button>
+          ))}
+           <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setQuickPeriod(undefined); }}
+              className={cn(
+                "font-normal transition-colors text-slate-300 hover:bg-white/30 border-slate-500 hover:text-white",
+                 (!quickPeriod)
+                  ? "bg-[#00A651] text-white hover:bg-[#008f48] border-[#00A651]"
+                  : "bg-white/20"
+              )}
+            >
+              Limpar Filtro
+            </Button>
         </div>
       </div>
     </div>

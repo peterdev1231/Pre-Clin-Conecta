@@ -116,16 +116,18 @@ export default function GenerateLinkFormModal({ isOpen, onClose }: GenerateLinkF
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-gradient-to-r from-[#1B3B2E] to-[#CCD5DE] text-slate-100 rounded-xl shadow-xl p-0 sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+      <DialogContent className="custom-generate-link-modal bg-gradient-to-r from-[#1B3B2E] to-[#CCD5DE] text-slate-100 rounded-xl shadow-xl p-0 sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] flex flex-col">
         <DialogHeader className="relative text-center p-6 sm:p-8 pb-4 sm:pb-6 border-b border-[#3A5A40]/70 flex-shrink-0">
-          <button 
-            type="button"
-            aria-label="Fechar"
-            onClick={onClose}
-            className="absolute top-5 right-5 sm:top-6 sm:right-6 p-1.5 rounded-full text-white bg-[#25392C] hover:bg-[#1B3B2E] transition-colors focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-[#1B3B2E] z-30"
-          >
-            <XIcon className="h-5 w-5" />
-          </button>
+          <DialogClose asChild>
+            <button 
+              type="button"
+              aria-label="Fechar"
+              onClick={onClose}
+              className="absolute top-5 right-5 sm:top-6 sm:right-6 p-1.5 rounded-full text-white bg-[#25392C] hover:bg-[#1B3B2E] transition-colors focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-[#1B3B2E] z-30"
+            >
+              <XIcon className="h-5 w-5" />
+            </button>
+          </DialogClose>
           <div className="flex items-center justify-center mb-2">
             <LinkIcon className="h-6 w-6 mr-2 text-[#00A651]" />
             <DialogTitle className="font-montserrat text-xl font-semibold text-slate-50 tracking-tight">
