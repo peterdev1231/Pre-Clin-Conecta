@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, PlusCircle } from 'lucide-react';
+import { Search, PlusCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -126,6 +126,17 @@ export default function ResponsesHeader({
                 </option>
               ))}
             </select>
+            {onRefresh && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onRefresh}
+                className="bg-white/20 text-slate-300 hover:bg-white/30 border-slate-500 hover:text-white p-2.5 aspect-square"
+                title="Atualizar lista"
+              >
+                <RefreshCw className="h-5 w-5" />
+              </Button>
+            )}
           </div>
         </div>
         
