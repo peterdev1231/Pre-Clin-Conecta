@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, User } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 // Variáveis de ambiente deverão ser configuradas na Vercel (e localmente em .env.local)
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -30,14 +31,17 @@ export async function POST(req: NextRequest) {
 
     // Extraindo dados com base na estrutura confirmada do payload
     const eventType = payload.event; // Ex: "PURCHASE_COMPLETE", "SUBSCRIPTION_CANCELLATION", etc.
-    const buyerEmail = payload.data?.buyer?.email;
+    const buyerEmail = payload.data?.buyer?.email?.toLowerCase();
     const hotmartTransactionId = payload.data?.purchase?.transaction; // ID da transação da Hotmart
     const hotmartSubscriberCode = payload.data?.subscription?.subscriber?.code; // Código do assinante da Hotmart
     const hotmartProductName = payload.data?.product?.name;
-    const hotmartPlanName = payload.data?.subscription?.plan?.name;
+    const hotmartPlanName = payload.data?.subscription?.plan?.name || payload.data?.product?.name;
     const hotmartOfferCode = payload.data?.purchase?.offer?.code;
     const purchaseApprovedDateTimestamp = payload.data?.purchase?.approved_date; // Timestamp em milissegundos
     const hotmartSubscriptionStatus = payload.data?.subscription?.status;
+    const dataInicioAssinaturaMs = payload.data?.purchase?.approved_date;
+    const dataProximaCobrancaMs = payload.data?.purchase?.date_next_charge;
+    const dataGarantiaMs = payload.data?.product?.warranty_date;
 
     if (!eventType || !buyerEmail) {
       console.error('Tipo de evento ou email do comprador não encontrado no payload.');
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     switch (eventType) {
       case 'PURCHASE_APPROVED':
-      case 'PURCHASE_COMPLETE':
+      case 'SUBSCRIPTION_ACTIVATED':
         console.log(`Evento '${eventType}' para ${buyerEmail}`);
         if (!hotmartTransactionId || !tipoPlanoParaDb || !dataExpiracaoAcessoParaDb || !statusAssinaturaParaDb) {
           console.error('[Webhook Hotmart] Dados insuficientes para processar compra aprovada (ID transação, tipoPlanoParaDb, dataExpiracaoAcessoParaDb ou statusAssinaturaParaDb ausentes).');
@@ -92,44 +96,68 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Dados insuficientes para processar compra' }, { status: 400 });
         }
 
-        // Primeiro, verifique se o usuário existe no Supabase Auth
-        const { data: authUserResponse, error: findAuthUserError } = await supabaseAdmin.auth.admin.getUserByEmail(buyerEmail);
+        let authUser: User | null = null;
+        let createAuthErrorObj: any = null;
+        let isNewAuthUser = false;
+        let userIdForProfile: string | undefined = undefined;
 
-        let userIdForProfile: string;
-        let isNewAuthUser = false; // Flag para saber se devemos enviar o email de boas-vindas com link de definir senha
+        try {
+            // Tenta criar o usuário primeiro
+            console.log(`[Webhook Hotmart] Tentando criar usuário no Auth para: ${buyerEmail}`);
+            const { data: newAuthUserData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                email: buyerEmail,
+                email_confirm: true, // Já que a compra foi confirmada
+                // Não definimos senha aqui, vamos gerar link de recuperação/definição
+            });
 
-        if (findAuthUserError) {
-            if (findAuthUserError.name === 'UserNotFoundError') {
-                // Usuário NÃO existe no Supabase Auth, então criamos
-                console.log(`[Webhook Hotmart] Usuário ${buyerEmail} não encontrado no Supabase Auth. Criando...`);
-                const temporaryPassword = Math.random().toString(36).slice(-12); // Senha temporária apenas para criação via API
-                const { data: newUserAuthData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-                    email: buyerEmail,
-                    password: temporaryPassword,
-                    email_confirm: true, // Confirma o email automaticamente
-                });
-
-                if (createUserError) {
-                    console.error(`[Webhook Hotmart] Erro ao criar usuário ${buyerEmail} no Supabase Auth:`, createUserError);
-                    return NextResponse.json({ error: 'Falha ao criar usuário no sistema de autenticação', detail: createUserError.message }, { status: 500 });
+            if (createError) {
+                if (createError.message.includes('User already registered') || createError.message.includes('A user with this email address has already been registered')) {
+                    console.warn(`[Webhook Hotmart] Usuário ${buyerEmail} já existe no Auth (detectado no erro de createUser). Buscando...`);
+                    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers(); // Lista todos, depois filtra. Idealmente, use getUserById se o erro de "já existe" retornasse o ID.
+                    // Como listUsers sem filtro pode ser grande, e não temos filtro de email direto no admin.listUsers,
+                    // esta abordagem assume que o email é único e o primeiro encontrado é o correto.
+                    // Em um cenário com muitos usuários, considere uma função RPC no Supabase para buscar por email.
+                    if (listError) {
+                        console.error(`[Webhook Hotmart] Erro ao listar usuários após falha na criação de ${buyerEmail}:`, listError);
+                        throw listError; // Re-throw para ser pego pelo catch externo
+                    }
+                    const existingUser = users.find(u => u.email === buyerEmail);
+                    if (existingUser) {
+                        authUser = existingUser;
+                        userIdForProfile = authUser.id;
+                        console.log(`[Webhook Hotmart] Usuário ${buyerEmail} encontrado no Auth: ${userIdForProfile}`);
+                    } else {
+                        console.error(`[Webhook Hotmart] Erro: usuário ${buyerEmail} reportado como existente, mas não encontrado na lista.`);
+                        createAuthErrorObj = { message: 'Usuário reportado como existente mas não encontrado.' }; 
+                        // Deixa cair para o catch externo ou tratamento de erro
+                        throw new Error(createAuthErrorObj.message);
+                    }
+                } else {
+                    // Outro erro durante a criação
+                    console.error(`[Webhook Hotmart] Erro ao CRIAR usuário no Supabase Auth para ${buyerEmail}:`, createError);
+                    createAuthErrorObj = createError;
+                    throw createError; // Re-throw para ser pego pelo catch externo
                 }
-                if (!newUserAuthData?.user) {
-                    console.error(`[Webhook Hotmart] Falha ao criar usuário ${buyerEmail} no Supabase Auth, dados do usuário nulos retornados.`);
-                    return NextResponse.json({ error: 'Falha ao criar usuário no sistema de autenticação, dados nulos.' }, { status: 500 });
-                }
-                userIdForProfile = newUserAuthData.user.id;
-                isNewAuthUser = true; 
-                console.log(`[Webhook Hotmart] Usuário Auth ${userIdForProfile} criado para ${buyerEmail}.`);
+            } else if (newAuthUserData && newAuthUserData.user) {
+                authUser = newAuthUserData.user;
+                userIdForProfile = authUser.id;
+                isNewAuthUser = true;
+                console.log(`[Webhook Hotmart] Usuário CRIADO com sucesso no Supabase Auth: ${userIdForProfile} para o email ${buyerEmail}`);
             } else {
-                // Um erro diferente de "usuário não encontrado" ocorreu ao verificar o Auth
-                console.error(`[Webhook Hotmart] Erro ao verificar usuário ${buyerEmail} no Supabase Auth:`, findAuthUserError);
-                return NextResponse.json({ error: 'Falha ao verificar usuário no sistema de autenticação', detail: findAuthUserError.message }, { status: 500 });
+                console.error(`[Webhook Hotmart] createUser retornou sucesso mas sem dados de usuário para ${buyerEmail}.`);
+                throw new Error('Dados do usuário nulos após criação no Auth bem-sucedida.');
             }
-        } else {
-            // Usuário JÁ EXISTE no Supabase Auth
-            userIdForProfile = authUserResponse.user.id;
-            console.log(`[Webhook Hotmart] Usuário ${buyerEmail} já existe no Supabase Auth (ID: ${userIdForProfile}).`);
-            isNewAuthUser = true; // Tratar como "novo" para fins de envio do email com link de acesso/senha.
+
+        } catch (error: any) {
+            console.error(`[Webhook Hotmart] Exceção geral ao tentar obter/criar usuário no Supabase Auth para ${buyerEmail}:`, error);
+            // Se createAuthErrorObj não foi setado, use o erro genérico
+            const finalError = createAuthErrorObj || error;
+            return NextResponse.json({ error: 'Falha ao gerenciar usuário no Supabase Auth', detail: finalError.message }, { status: 500 });
+        }
+
+        if (!userIdForProfile) {
+            console.error(`[Webhook Hotmart] userIdForProfile não foi definido para ${buyerEmail}. Isso não deveria acontecer se não houve erro anterior.`);
+            return NextResponse.json({ error: 'ID do usuário no Auth não pôde ser determinado criticamente.' }, { status: 500 });
         }
 
         // Agora, crie ou atualize o PERFIL em 'perfis_profissionais'
@@ -258,7 +286,7 @@ export async function POST(req: NextRequest) {
         
         const idToSearch = hotmartSubscriberCode || hotmartTransactionId;
         if (!idToSearch) {
-            console.error('Não foi possível encontrar um ID (subscriber_code ou transaction_id) para buscar o perfil para revogação.');
+            console.error('[Webhook Hotmart] Não foi possível encontrar um ID (subscriber_code ou transaction_id) para buscar o perfil para revogação.');
             return NextResponse.json({ error: 'ID de assinante/transação ausente para revogação' }, { status: 400 });
         }
 
@@ -273,39 +301,38 @@ export async function POST(req: NextRequest) {
           newStatus = 'cancelado'; // Ou 'inativo' dependendo da sua regra de negócio
         }
 
-        const { data: profileToUpdate, error: findProfileError } = await supabaseAdmin
+        const { data: profileToUpdate, error: findProfileToRevokeError } = await supabaseAdmin
             .from('perfis_profissionais')
             .select('id')
             .or(`hotmart_subscriber_code.eq.${idToSearch},hotmart_purchase_id.eq.${idToSearch}`)
-            .eq('email', buyerEmail) // Adicionar filtro de email para segurança
-            .maybeSingle(); // Usar maybeSingle para não dar erro se não encontrar, mas tratar o caso
+            .maybeSingle();
 
-        if (findProfileError) {
-            console.error('Erro ao buscar perfil para revogação:', findProfileError);
-            throw findProfileError;
+        if (findProfileToRevokeError) {
+            console.error(`[Webhook Hotmart] Erro ao buscar perfil para revogação (ID: ${idToSearch}, Email: ${buyerEmail}):`, findProfileToRevokeError);
+            return NextResponse.json({ error: 'Falha ao buscar perfil para revogação', detail: findProfileToRevokeError.message }, { status: 500 });
         }
 
-        if (!profileToUpdate) {
+        if (profileToUpdate) {
+            const { error: updateError } = await supabaseAdmin
+              .from('perfis_profissionais')
+              .update({
+                status_assinatura: newStatus,
+                // Opcional: definir data_expiracao_acesso para a data atual se o acesso for imediato
+                // data_expiracao_acesso: new Date().toISOString(), 
+                atualizado_em: new Date().toISOString(),
+              })
+              .eq('id', profileToUpdate.id);
+
+            if (updateError) {
+              console.error('Erro ao atualizar status da assinatura para revogação:', updateError);
+              throw updateError;
+            }
+            console.log(`Acesso revogado/atualizado para ${buyerEmail} (status: ${newStatus}) devido ao evento ${eventType}.`);
+        } else {
             console.warn(`Perfil não encontrado para revogação com ID ${idToSearch} e email ${buyerEmail}. O acesso pode já ter sido removido ou os dados não batem.`);
             // Retornar 200 para não fazer a Hotmart reenviar, já que não há o que fazer aqui.
             return NextResponse.json({ message: 'Perfil não encontrado para revogação, nada a fazer.' }, { status: 200 });
         }
-
-        const { error: updateError } = await supabaseAdmin
-          .from('perfis_profissionais')
-          .update({
-            status_assinatura: newStatus,
-            // Opcional: definir data_expiracao_acesso para a data atual se o acesso for imediato
-            // data_expiracao_acesso: new Date().toISOString(), 
-            atualizado_em: new Date().toISOString(),
-          })
-          .eq('id', profileToUpdate.id);
-
-        if (updateError) {
-          console.error('Erro ao atualizar status da assinatura para revogação:', updateError);
-          throw updateError;
-        }
-        console.log(`Acesso revogado/atualizado para ${buyerEmail} (status: ${newStatus}) devido ao evento ${eventType}.`);
         break;
       
       // Adicionar outros casos conforme necessário (ex: 'billet_printed', 'trial_conversion', etc.)
