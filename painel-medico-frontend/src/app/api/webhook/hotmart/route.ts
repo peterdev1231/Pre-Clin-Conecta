@@ -83,119 +83,169 @@ export async function POST(req: NextRequest) {
       case 'PURCHASE_COMPLETE':
         console.log(`Evento '${eventType}' para ${buyerEmail}`);
         if (!hotmartTransactionId || !tipoPlanoParaDb || !dataExpiracaoAcessoParaDb || !statusAssinaturaParaDb) {
-          console.error('Dados insuficientes para processar compra aprovada (ID transação, tipoPlanoParaDb, dataExpiracaoAcessoParaDb ou statusAssinaturaParaDb ausentes).');
-          console.error(`Valores: hotmartTransactionId=${hotmartTransactionId}, tipoPlanoParaDb=${tipoPlanoParaDb}, dataExpiracaoAcessoParaDb=${dataExpiracaoAcessoParaDb}, statusAssinaturaParaDb=${statusAssinaturaParaDb}`);
+          console.error('[Webhook Hotmart] Dados insuficientes para processar compra aprovada (ID transação, tipoPlanoParaDb, dataExpiracaoAcessoParaDb ou statusAssinaturaParaDb ausentes).');
+          console.error(`[Webhook Hotmart] Valores: hotmartTransactionId=${hotmartTransactionId}, tipoPlanoParaDb=${tipoPlanoParaDb}, dataExpiracaoAcessoParaDb=${dataExpiracaoAcessoParaDb}, statusAssinaturaParaDb=${statusAssinaturaParaDb}`);
           if (!tipoPlanoParaDb) {
-            console.warn(`Nome do plano Hotmart não reconhecido: '${hotmartPlanName}'. Verifique a configuração dos nomes dos planos.`);
+            console.warn(`[Webhook Hotmart] Nome do plano Hotmart não reconhecido: '${hotmartPlanName}'. Verifique a configuração dos nomes dos planos.`);
             return NextResponse.json({ message: 'Nome do plano não reconhecido, evento ignorado.' }, { status: 200 });
           }
           return NextResponse.json({ error: 'Dados insuficientes para processar compra' }, { status: 400 });
         }
 
-        const { data: existingUser, error: findUserError } = await supabaseAdmin
-          .from('perfis_profissionais')
-          .select('id, user_id, email, status_assinatura, tipo_plano, data_expiracao_acesso, plano_hotmart_id')
-          .eq('email', buyerEmail)
-          .single();
+        // Primeiro, verifique se o usuário existe no Supabase Auth
+        const { data: authUserResponse, error: findAuthUserError } = await supabaseAdmin.auth.admin.getUserByEmail(buyerEmail);
 
-        if (findUserError && findUserError.code !== 'PGRST116') {
-          console.error('Erro ao buscar usuário:', findUserError);
-          throw findUserError;
+        let userIdForProfile: string;
+        let isNewAuthUser = false; // Flag para saber se devemos enviar o email de boas-vindas com link de definir senha
+
+        if (findAuthUserError) {
+            if (findAuthUserError.name === 'UserNotFoundError') {
+                // Usuário NÃO existe no Supabase Auth, então criamos
+                console.log(`[Webhook Hotmart] Usuário ${buyerEmail} não encontrado no Supabase Auth. Criando...`);
+                const temporaryPassword = Math.random().toString(36).slice(-12); // Senha temporária apenas para criação via API
+                const { data: newUserAuthData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
+                    email: buyerEmail,
+                    password: temporaryPassword,
+                    email_confirm: true, // Confirma o email automaticamente
+                });
+
+                if (createUserError) {
+                    console.error(`[Webhook Hotmart] Erro ao criar usuário ${buyerEmail} no Supabase Auth:`, createUserError);
+                    return NextResponse.json({ error: 'Falha ao criar usuário no sistema de autenticação', detail: createUserError.message }, { status: 500 });
+                }
+                if (!newUserAuthData?.user) {
+                    console.error(`[Webhook Hotmart] Falha ao criar usuário ${buyerEmail} no Supabase Auth, dados do usuário nulos retornados.`);
+                    return NextResponse.json({ error: 'Falha ao criar usuário no sistema de autenticação, dados nulos.' }, { status: 500 });
+                }
+                userIdForProfile = newUserAuthData.user.id;
+                isNewAuthUser = true; 
+                console.log(`[Webhook Hotmart] Usuário Auth ${userIdForProfile} criado para ${buyerEmail}.`);
+            } else {
+                // Um erro diferente de "usuário não encontrado" ocorreu ao verificar o Auth
+                console.error(`[Webhook Hotmart] Erro ao verificar usuário ${buyerEmail} no Supabase Auth:`, findAuthUserError);
+                return NextResponse.json({ error: 'Falha ao verificar usuário no sistema de autenticação', detail: findAuthUserError.message }, { status: 500 });
+            }
+        } else {
+            // Usuário JÁ EXISTE no Supabase Auth
+            userIdForProfile = authUserResponse.user.id;
+            console.log(`[Webhook Hotmart] Usuário ${buyerEmail} já existe no Supabase Auth (ID: ${userIdForProfile}).`);
+            isNewAuthUser = true; // Tratar como "novo" para fins de envio do email com link de acesso/senha.
         }
 
-        let finalTipoPlano: 'mensal' | 'anual_trial' | 'anual_pago' | null = tipoPlanoParaDb;
-        let finalStatusAssinatura: 'ativo' | 'trial' | 'inativo' | 'cancelado' | 'reembolsado' | 'chargeback' | null = statusAssinaturaParaDb;
-        let finalDataExpiracao: Date | null = dataExpiracaoAcessoParaDb;
-        let finalDataInicio: Date = dataInicioAssinaturaParaDb;
-
-        if (existingUser) {
-          console.log(`Usuário ${buyerEmail} encontrado. Verificando necessidade de atualização...`);
-          if (hotmartPlanName === 'PréClin Conecta - Anual' &&
-              existingUser.tipo_plano === 'anual_trial' &&
-              existingUser.status_assinatura === 'trial') {
-            console.log(`Potencial conversão de trial para anual pago para ${buyerEmail}.`);
-            finalTipoPlano = 'anual_pago';
-            finalStatusAssinatura = 'ativo';
-            finalDataInicio = dataInicioAssinaturaParaDb;
-            finalDataExpiracao = new Date(finalDataInicio);
-            finalDataExpiracao.setFullYear(finalDataExpiracao.getFullYear() + 1);
-            console.log(`Convertido para anual_pago. Nova data de expiração: ${finalDataExpiracao.toISOString()}`);
-          } else if (
-            existingUser.plano_hotmart_id !== (hotmartOfferCode || hotmartPlanName || hotmartProductName || 'N/A') ||
-            existingUser.tipo_plano !== finalTipoPlano ||
-            existingUser.status_assinatura !== finalStatusAssinatura ||
-            (existingUser.data_expiracao_acesso && finalDataExpiracao && new Date(existingUser.data_expiracao_acesso).getTime() !== finalDataExpiracao.getTime())
-          ) {
-            console.log('Atualizando perfil existente com novos dados da compra/assinatura.');
-          } else {
-            console.log('Dados do perfil já estão atualizados. Nenhuma alteração necessária.');
-            return NextResponse.json({ message: 'Webhook processado, perfil já atualizado.' }, { status: 200 });
-          }
-
-          const { error: updateProfileError } = await supabaseAdmin
+        // Agora, crie ou atualize o PERFIL em 'perfis_profissionais'
+        const nomeComprador = payload.data?.buyer?.name;
+        const { data: existingProfile, error: findProfileError } = await supabaseAdmin
             .from('perfis_profissionais')
-            .update({
-              plano_hotmart_id: hotmartOfferCode || hotmartPlanName || hotmartProductName || 'N/A',
-              tipo_plano: finalTipoPlano,
-              status_assinatura: finalStatusAssinatura,
-              data_inicio_assinatura: finalDataInicio.toISOString(),
-              data_expiracao_acesso: finalDataExpiracao!.toISOString(),
-              hotmart_subscriber_code: hotmartSubscriberCode || hotmartTransactionId,
-              hotmart_purchase_id: hotmartTransactionId,
-              atualizado_em: new Date().toISOString(),
-            })
-            .eq('user_id', existingUser.user_id);
+            .select('id, nome_completo') // Selecionar nome_completo para manter se não vier novo
+            .eq('user_id', userIdForProfile)
+            .single(); 
 
-          if (updateProfileError) {
-            console.error('Erro ao atualizar perfil profissional:', updateProfileError);
-            throw updateProfileError;
-          }
-          console.log(`Perfil de ${buyerEmail} atualizado. Plano: ${finalTipoPlano}, Status: ${finalStatusAssinatura}, Expiração: ${finalDataExpiracao!.toISOString()}`);
+        if (findProfileError && findProfileError.code !== 'PGRST116') { // PGRST116 = zero rows
+            console.error(`[Webhook Hotmart] Erro ao buscar perfil para user_id ${userIdForProfile} (Email: ${buyerEmail}):`, findProfileError);
+            return NextResponse.json({ error: 'Falha ao buscar perfil profissional', detail: findProfileError.message }, { status: 500 });
+        }
 
-        } else { 
-          console.log(`Usuário ${buyerEmail} não encontrado. Criando novo usuário e perfil.`);
-          const password = Math.random().toString(36).slice(-10);
-          const { data: newUserAuth, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-            email: buyerEmail,
-            password: password,
-            email_confirm: true,
-          });
+        if (existingProfile) {
+            console.log(`[Webhook Hotmart] Perfil para ${buyerEmail} (user_id: ${userIdForProfile}) encontrado. Atualizando...`);
+            const { error: updateProfileError } = await supabaseAdmin
+                .from('perfis_profissionais')
+                .update({
+                    plano_hotmart_id: hotmartOfferCode || hotmartPlanName || hotmartProductName || 'N/A',
+                    tipo_plano: tipoPlanoParaDb, 
+                    status_assinatura: statusAssinaturaParaDb,
+                    data_inicio_assinatura: dataInicioAssinaturaParaDb.toISOString(),
+                    data_expiracao_acesso: dataExpiracaoAcessoParaDb!.toISOString(),
+                    hotmart_subscriber_code: hotmartSubscriberCode || hotmartTransactionId,
+                    hotmart_purchase_id: hotmartTransactionId,
+                    nome_completo: nomeComprador || existingProfile.nome_completo, 
+                    atualizado_em: new Date().toISOString(),
+                })
+                .eq('user_id', userIdForProfile);
 
-          if (createUserError) {
-            console.error('Erro ao criar usuário no Supabase Auth:', createUserError);
-            throw createUserError;
-          }
-          if (!newUserAuth || !newUserAuth.user) {
-            console.error('Falha ao criar usuário no Supabase Auth, newUserAuth.user é nulo.');
-            throw new Error('Falha ao criar usuário no Supabase Auth.');
-          }
-
-          const { error: insertProfileError } = await supabaseAdmin
-            .from('perfis_profissionais')
-            .insert({
-              user_id: newUserAuth.user.id,
-              email: buyerEmail,
-              plano_hotmart_id: hotmartOfferCode || hotmartPlanName || hotmartProductName || 'N/A',
-              tipo_plano: finalTipoPlano,
-              status_assinatura: finalStatusAssinatura,
-              data_inicio_assinatura: finalDataInicio.toISOString(),
-              data_expiracao_acesso: finalDataExpiracao!.toISOString(),
-              hotmart_subscriber_code: hotmartSubscriberCode || hotmartTransactionId,
-              hotmart_purchase_id: hotmartTransactionId,
-            });
-
-          if (insertProfileError) {
-            console.error('Erro ao inserir perfil profissional:', insertProfileError);
-            const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(newUserAuth.user.id);
-            if (deleteUserError) {
-                console.error('Erro ao tentar deletar usuário do Auth após falha na inserção do perfil:', deleteUserError);
-            } else {
-                console.log('Usuário do Auth deletado após falha na inserção do perfil.');
+            if (updateProfileError) {
+                console.error(`[Webhook Hotmart] Erro ao atualizar perfil profissional para ${buyerEmail}:`, updateProfileError);
+                return NextResponse.json({ error: 'Falha ao atualizar perfil profissional', detail: updateProfileError.message }, { status: 500 });
             }
-            throw insertProfileError;
-          }
-          console.log(`Usuário ${buyerEmail} e perfil criados. Plano: ${finalTipoPlano}, Status: ${finalStatusAssinatura}, Expiração: ${finalDataExpiracao!.toISOString()}. Senha: ${password} (enviar por email).`);
-          // TODO: Implementar envio de email com a senha
+            console.log(`[Webhook Hotmart] Perfil de ${buyerEmail} atualizado.`);
+        } else {
+            console.log(`[Webhook Hotmart] Perfil para ${buyerEmail} (user_id: ${userIdForProfile}) não encontrado. Criando...`);
+            const { error: insertProfileError } = await supabaseAdmin
+                .from('perfis_profissionais')
+                .insert({
+                    user_id: userIdForProfile,
+                    email: buyerEmail,
+                    nome_completo: nomeComprador,
+                    plano_hotmart_id: hotmartOfferCode || hotmartPlanName || hotmartProductName || 'N/A',
+                    tipo_plano: tipoPlanoParaDb,
+                    status_assinatura: statusAssinaturaParaDb,
+                    data_inicio_assinatura: dataInicioAssinaturaParaDb.toISOString(),
+                    data_expiracao_acesso: dataExpiracaoAcessoParaDb!.toISOString(),
+                    hotmart_subscriber_code: hotmartSubscriberCode || hotmartTransactionId,
+                    hotmart_purchase_id: hotmartTransactionId,
+                });
+
+            if (insertProfileError) {
+                console.error(`[Webhook Hotmart] Erro ao inserir perfil profissional para ${buyerEmail}:`, insertProfileError);
+                return NextResponse.json({ error: 'Falha ao criar perfil profissional', detail: insertProfileError.message }, { status: 500 });
+            }
+            console.log(`[Webhook Hotmart] Perfil profissional para ${buyerEmail} (Nome: ${nomeComprador || 'N/A'}) criado com sucesso.`);
+        }
+
+        if (isNewAuthUser) {
+            const appURL = process.env.NEXT_PUBLIC_APP_URL;
+            const welcomeEmailFunctionUrl = process.env.SUPABASE_WELCOME_EMAIL_FUNCTION_URL;
+
+            if (!appURL) {
+                console.error('[Webhook Hotmart] NEXT_PUBLIC_APP_URL não definida. Não é possível gerar link de recuperação ou enviar email corretamente.');
+            }
+            if (!welcomeEmailFunctionUrl) {
+                console.error('[Webhook Hotmart] SUPABASE_WELCOME_EMAIL_FUNCTION_URL não definida. Não é possível enviar email de boas-vindas.');
+            }
+
+            if (appURL && welcomeEmailFunctionUrl) {
+                let passwordSetupLink: string | undefined = undefined;
+                const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+                    type: 'recovery',
+                    email: buyerEmail,
+                    options: { redirectTo: `${appURL}/atualizar-senha` }
+                });
+
+                if (linkError) {
+                    console.error(`[Webhook Hotmart] Erro ao gerar link de recuperação para ${buyerEmail}:`, linkError);
+                } else if (linkData?.properties?.action_link) {
+                    passwordSetupLink = linkData.properties.action_link;
+                    console.log(`[Webhook Hotmart] Link de definição de senha gerado para ${buyerEmail}.`);
+                } else {
+                     console.warn(`[Webhook Hotmart] Não foi possível obter action_link para ${buyerEmail} ao gerar link de recuperação.`);
+                }
+                
+                try {
+                    const emailPayload = {
+                        emailDestinatario: buyerEmail,
+                        nomeDestinatario: nomeComprador || buyerEmail.split('@')[0],
+                        linkDefinicaoSenha: passwordSetupLink 
+                    };
+                    console.log('[Webhook Hotmart] Enviando payload para função de email:', JSON.stringify(emailPayload));
+                    
+                    const emailResponse = await fetch(welcomeEmailFunctionUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(emailPayload),
+                    });
+
+                    if (emailResponse.ok) {
+                        const emailResult = await emailResponse.json();
+                        console.log(`[Webhook Hotmart] Email de boas-vindas solicitado para ${buyerEmail}. ID da mensagem Resend: ${emailResult.resendMessageId}`);
+                    } else {
+                        const errorBody = await emailResponse.text();
+                        console.error(`[Webhook Hotmart] Falha ao solicitar email de boas-vindas para ${buyerEmail}. Status: ${emailResponse.status}. Resposta: ${errorBody}`);
+                    }
+                } catch (emailError) {
+                    console.error(`[Webhook Hotmart] Erro de rede ou inesperado ao chamar a função de email para ${buyerEmail}:`, emailError);
+                }
+            }
+        } else {
+            console.log(`[Webhook Hotmart] Usuário ${buyerEmail} já existia no Auth e não foi tratado como novo para envio de email de boas-vindas com link de senha. Perfil atualizado, se aplicável.`);
         }
         break;
 
