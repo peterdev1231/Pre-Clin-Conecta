@@ -13,6 +13,7 @@ interface FetchedResponseData {
   nome_paciente: string; 
   data_envio: string | null; // data_envio pode ser null conforme database.types.ts
   revisado_pelo_profissional: boolean | null; // Corrigido de 'lido' e pode ser null
+  link_formulario_id: string; // Adicionado para o filtro realtime
   code?: string;
 }
 
@@ -35,6 +36,8 @@ export default function PatientResponsesView() {
   const [quickPeriod, setQuickPeriod] = useState<string | undefined>(undefined);
 
   const [isGenerateLinkModalOpen, setIsGenerateLinkModalOpen] = useState(false);
+
+  const [profissionalLinkIds, setProfissionalLinkIds] = useState<string[]>([]); // Estado para IDs de link
 
   // Cálculo dos contadores
   const totalCount = responses.length;
@@ -61,9 +64,10 @@ export default function PatientResponsesView() {
 
   const fetchResponses = useCallback(async () => {
     console.log("[PatientResponsesView] fetchResponses called. User:", user?.id, "SearchTerm:", searchTerm, "StatusFilter:", statusFilter, "QuickPeriod:", quickPeriod);
-    if (!user) {
-      console.log("[PatientResponsesView] No user, aborting fetch.");
+    if (!user || !supabase) { // Adicionado !supabase para segurança
+      console.log("[PatientResponsesView] No user or supabase client, aborting fetch.");
       setIsLoading(false);
+      setProfissionalLinkIds([]); // Limpa os link IDs
       return;
     }
     setIsLoading(true);
@@ -107,15 +111,16 @@ export default function PatientResponsesView() {
         return;
       }
 
-      const linkIds = linksData.map(link => link.id);
-      console.log("[PatientResponsesView] Step 2 Result - Link IDs for query:", linkIds);
+      const currentLinkIds = linksData.map(link => link.id);
+      setProfissionalLinkIds(currentLinkIds); // Armazena os IDs de link
+      console.log("[PatientResponsesView] Step 2 Result - Link IDs for query:", currentLinkIds);
 
-      console.log("[PatientResponsesView] Step 3: Fetching respostas_pacientes for link_ids:", linkIds);
+      console.log("[PatientResponsesView] Step 3: Fetching respostas_pacientes for link_ids:", currentLinkIds);
       
       let query = supabase
         .from('respostas_pacientes')
-        .select('id, nome_paciente, data_envio, revisado_pelo_profissional') 
-        .in('link_formulario_id', linkIds);
+        .select('id, nome_paciente, data_envio, revisado_pelo_profissional, link_formulario_id') 
+        .in('link_formulario_id', currentLinkIds);
 
       // Aplicar filtro de data se quickPeriod estiver definido
       let effectiveFrom: Date | undefined;
@@ -196,12 +201,58 @@ export default function PatientResponsesView() {
       console.log("[PatientResponsesView] fetchResponses finally block. isLoading should be false.");
       setIsLoading(false);
     }
-  }, [user, searchTerm, supabase, statusFilter, quickPeriod]);
+  }, [user, supabase, searchTerm, statusFilter, quickPeriod]);
 
   useEffect(() => {
     console.log("[PatientResponsesView] useEffect for fetchResponses triggered.");
     fetchResponses();
   }, [fetchResponses]);
+
+  // useEffect para Realtime updates
+  useEffect(() => {
+    if (!supabase || !user || profissionalLinkIds.length === 0) {
+      console.log('[Realtime] Condições não atendidas para inscrição (sem supabase, user ou linkIds).');
+      return;
+    }
+
+    console.log('[Realtime] Configurando inscrição para link_ids:', profissionalLinkIds);
+    const channel = supabase.channel('respostas-pacientes-profissional-' + user.id) // Canal específico do usuário
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'respostas_pacientes',
+          // Filtro no lado do cliente, pois o filtro server-side por array de IDs pode ser limitado
+        },
+        (payload) => {
+          console.log('[Realtime] Nova submissão recebida (payload):', payload);
+          const novaResposta = payload.new as FetchedResponseData;
+          
+          // Verifica se a nova resposta pertence a um dos links do profissional
+          if (novaResposta && novaResposta.link_formulario_id && profissionalLinkIds.includes(novaResposta.link_formulario_id)) {
+            console.log('[Realtime] Nova resposta relevante detectada para o profissional. Atualizando...');
+            fetchResponses(); // Recarrega os dados para incluir a nova resposta
+          } else {
+            console.log('[Realtime] Nova resposta não é relevante para os links deste profissional ou falta link_formulario_id:', profissionalLinkIds, novaResposta?.link_formulario_id);
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] Conectado ao canal de respostas!');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[Realtime] Erro ou timeout no canal:', err);
+        }
+      });
+
+    return () => {
+      if (channel) {
+        console.log('[Realtime] Removendo inscrição do canal.');
+        supabase.removeChannel(channel).catch(err => console.error('[Realtime] Erro ao remover canal:', err));
+      }
+    };
+  }, [supabase, user, profissionalLinkIds, fetchResponses]); // Adicionado fetchResponses como dependência
 
   const handleResponseDeleted = (responseId: string) => {
     setResponses(prevResponses => prevResponses.filter(response => response.id !== responseId));
