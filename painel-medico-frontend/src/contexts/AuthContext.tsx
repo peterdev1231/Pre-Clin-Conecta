@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
+import type { Session, User, SupabaseClient, AuthChangeEvent } from '@supabase/supabase-js';
 
 interface AuthContextType {
   session: Session | null;
@@ -27,7 +27,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     console.log('%cAuthContext: useEffect mounting. Setting up onAuthStateChange listener.', 'color: purple; font-weight: bold;', {
-      initialHash: typeof window !== 'undefined' ? window.location.hash : 'N/A'
+      initialHash: typeof window !== 'undefined' ? window.location.hash : 'N/A',
+      initialPath: typeof window !== 'undefined' ? window.location.pathname : 'N/A'
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -37,7 +38,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         {
           event: event,
           session: session,
-          hashAtEventTime: typeof window !== 'undefined' ? window.location.hash : "N/A"
+          hashAtEventTime: typeof window !== 'undefined' ? window.location.hash : "N/A",
+          pathAtEventTime: typeof window !== 'undefined' ? window.location.pathname : "N/A"
         }
       );
 
@@ -48,7 +50,59 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (event === 'PASSWORD_RECOVERY') {
         console.log('%cAuthContext: PASSWORD_RECOVERY event detected!', 'color: green; font-weight: bold;', session);
       }
+      
+      if (event === 'SIGNED_IN') {
+        console.log('%cAuthContext: SIGNED_IN event detected!', 'color: green; font-weight: bold;', {
+          user: session?.user,
+          metadata: session?.user?.user_metadata,
+          path: typeof window !== 'undefined' ? window.location.pathname : "N/A"
+        });
+        
+        // Verificar se o usuário está acessando pela primeira vez com base nos metadados
+        const metadata = session?.user?.user_metadata || {};
+        if (metadata.status === 'awaiting_first_access' && 
+            !metadata.first_access_completed_at && 
+            typeof window !== 'undefined') {
+          const path = window.location.pathname;
+          // Se estiver na página de login e for primeiro acesso, redirecionar para definir senha
+          if (path === '/login') {
+            window.location.href = '/definir-senha';
+          }
+        }
+      }
+      
+      // Eventos válidos para AuthChangeEvent incluem:
+      // 'INITIAL_SESSION', 'SIGNED_IN', 'SIGNED_OUT', 'USER_UPDATED',
+      // 'USER_DELETED', 'PASSWORD_RECOVERY', 'TOKEN_REFRESHED', 'MFA_CHALLENGE_VERIFIED'
+      if (event === 'USER_UPDATED') {
+        console.log('%cAuthContext: USER_UPDATED event detected!', 'color: green; font-weight: bold;', session);
+      }
     });
+
+    // Carregar a sessão no carregamento inicial
+    const initializeSession = async () => {
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error fetching initial session:', error);
+        } else if (initialSession) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          
+          console.log('%cAuthContext: Initial session loaded', 'color: purple;', {
+            user: initialSession.user,
+            metadata: initialSession.user.user_metadata
+          });
+        }
+      } catch (err) {
+        console.error('Unexpected error loading session:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    initializeSession();
 
     return () => {
       console.log('%cAuthContext: useEffect unmounting. Unsubscribing authListener.', 'color: purple;');
