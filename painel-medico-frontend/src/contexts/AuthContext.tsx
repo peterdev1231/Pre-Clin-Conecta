@@ -26,6 +26,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Temporariamente comentado para depurar o fluxo de PASSWORD_RECOVERY
+    /*
     const getInitialSession = async () => {
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     getInitialSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      console.log('AuthContext: onAuthStateChange event:', _event, 'session:', currentSession); // Adicionado log
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
     });
@@ -49,6 +52,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       authListener.subscription.unsubscribe();
     };
+    */
+    console.log('AuthContext: Lógica de sessão inicial e listener temporariamente desabilitados para teste de PASSWORD_RECOVERY.');
+    setLoading(false); // Garante que o loading não fique preso
   }, [supabase]);
 
   const signOut = async () => {
