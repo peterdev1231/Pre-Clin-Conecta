@@ -17,26 +17,48 @@ export default function UpdatePasswordForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
   const [isSessionReady, setIsSessionReady] = useState(false);
+  const [initialUrlIndicatedRecovery, setInitialUrlIndicatedRecovery] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const hash = window.location.hash;
-      if (session && hash.includes('type=recovery')) {
-        console.log('UpdatePasswordForm: Sessão via AuthContext detectada no fluxo de recuperação. Formulário pronto.');
-        setIsSessionReady(true);
-      } else if (!session && hash.includes('type=recovery')) {
-        console.log('UpdatePasswordForm: Fluxo de recuperação indicado pela URL, mas sem sessão do AuthContext ainda. Aguardando...');
-        setIsSessionReady(false); // Mantém "Aguarde..."
-      } else if (session && !hash.includes('type=recovery')) {
-        console.warn('UpdatePasswordForm: Sessão existe, mas URL não indica fluxo de recuperação. Acesso indevido?');
-        setError("Página de atualização de senha acessada fora do fluxo de recuperação.");
-        setIsSessionReady(false);
+      const currentHash = window.location.hash;
+      if (currentHash.includes('type=recovery')) {
+        console.log('UpdatePasswordForm (Mount Effect): Initial URL indicates recovery flow. Hash:', currentHash);
+        setInitialUrlIndicatedRecovery(true);
       } else {
-        console.log('UpdatePasswordForm: Sem sessão do AuthContext ou não está no fluxo de recuperação.');
-        setIsSessionReady(false);
+        console.log('UpdatePasswordForm (Mount Effect): Initial URL does NOT indicate recovery flow. Hash:', currentHash);
       }
     }
-  }, [session, supabase]);
+  }, []);
+
+  useEffect(() => {
+    console.log('UpdatePasswordForm (Session/Recovery Check Effect): Evaluating form readiness.', {
+      hasSession: !!session,
+      didInitialUrlIndicateRecovery: initialUrlIndicatedRecovery,
+      currentHashAtCheckTime: typeof window !== 'undefined' ? window.location.hash : 'N/A'
+    });
+
+    if (initialUrlIndicatedRecovery && session) {
+      console.log('UpdatePasswordForm: Recovery flow confirmed by initial URL AND session active. Formulário pronto.');
+      setIsSessionReady(true);
+      setError(null);
+    } else if (initialUrlIndicatedRecovery && !session) {
+      console.log('UpdatePasswordForm: Initial URL was for recovery, but no session from AuthContext yet. Aguardando...');
+      setIsSessionReady(false);
+    } else if (!initialUrlIndicatedRecovery && session) {
+      console.warn('UpdatePasswordForm: Session exists, but initial URL did not indicate recovery flow. Possible direct navigation or lost hash.');
+      setError("Página de atualização de senha acessada fora do fluxo de recuperação ou o link expirou/foi modificado.");
+      setIsSessionReady(false);
+    } else {
+      console.log('UpdatePasswordForm: Not a recovery flow from initial URL and no session.');
+      setIsSessionReady(false);
+      if (!initialUrlIndicatedRecovery && window.location.hash.includes('type=recovery')){
+          console.warn('UpdatePasswordForm: Discrepancy - current hash indicates recovery, but initial check did not (or state not updated yet).');
+      } else if (!initialUrlIndicatedRecovery){
+        setError("Para definir uma nova senha, por favor, utilize um link de recuperação válido.");
+      }
+    }
+  }, [session, initialUrlIndicatedRecovery]);
 
   const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -66,7 +88,7 @@ export default function UpdatePasswordForm() {
       setSuccess('Senha atualizada com sucesso! Você já pode fazer login com sua nova senha.');
       setTimeout(() => {
         router.push('/login');
-      }, 3000); // Redireciona para login após 3 segundos
+      }, 3000);
 
     } catch (err: unknown) {
       console.error('Update password error:', err);
