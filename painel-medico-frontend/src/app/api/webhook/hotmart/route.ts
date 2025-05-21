@@ -220,6 +220,13 @@ export async function POST(req: NextRequest) {
     // Este link é para o primeiro acesso, mas pode ser usado para reset se o usuário já existir e não tiver senha.
     // A URL de redirecionamento deve ser a sua página /definir-senha no frontend.
     const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/definir-senha`;
+
+    console.log('[Hotmart Webhook] Detalhes da Geração do Link:', {
+      email: emailComprador,
+      redirectToUsado: redirectUrl, 
+      NEXT_PUBLIC_APP_URL_Valor: process.env.NEXT_PUBLIC_APP_URL
+    });
+
     const { data: linkData, error: erroLink } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink', // Pode ser 'signup' se o usuário é novo, ou 'recovery' se já existe. Magiclink pode funcionar bem aqui.
                          // Usar 'recovery' para garantir que funcione mesmo se o usuário já existir (para definir a senha inicial).
