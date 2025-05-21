@@ -20,18 +20,25 @@ export default function UpdatePasswordForm() {
 
   // Lidar com o token da URL (geralmente no hash)
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
+    console.log('UpdatePasswordForm: useEffect montado. Tentando escutar onAuthStateChange.');
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('UpdatePasswordForm: onAuthStateChange disparado com evento:', event, 'e sessão:', session);
       if (event === 'PASSWORD_RECOVERY') {
-        // Aqui você poderia extrair o token de acesso se necessário para alguma lógica específica,
-        // mas o Supabase JS SDK geralmente lida com isso internamente para updateUser.
-        // Se o evento é PASSWORD_RECOVERY, significa que o usuário clicou no link de recuperação
-        // e o SDK está pronto para a atualização da senha.
-        console.log('Sessão de recuperação de senha detectada e pronta.');
+        console.log('UpdatePasswordForm: Evento PASSWORD_RECOVERY detectado!');
         setIsSessionReady(true);
+      } else {
+        console.log('UpdatePasswordForm: Evento recebido não é PASSWORD_RECOVERY:', event);
       }
     });
 
+    // Verifica imediatamente se já existe uma sessão válida (embora para recovery, o evento seja mais importante)
+    // supabase.auth.getSession().then(({ data: { session } }) => {
+    //   console.log('UpdatePasswordForm: Sessão atual ao montar:', session);
+    //   // Se já houver uma sessão de usuário normal, talvez não seja o fluxo de recovery
+    // });
+
     return () => {
+      console.log('UpdatePasswordForm: useEffect cleanup. Desinscrevendo authListener.');
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
