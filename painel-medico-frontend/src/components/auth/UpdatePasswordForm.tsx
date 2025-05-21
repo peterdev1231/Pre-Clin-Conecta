@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'; // Para redirecionamento
 import Link from 'next/link';
 
 export default function UpdatePasswordForm() {
-  const { supabase } = useAuth();
+  const { supabase, session } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -18,30 +18,25 @@ export default function UpdatePasswordForm() {
   const router = useRouter();
   const [isSessionReady, setIsSessionReady] = useState(false);
 
-  // Lidar com o token da URL (geralmente no hash)
   useEffect(() => {
-    console.log('UpdatePasswordForm: useEffect montado. Tentando escutar onAuthStateChange.');
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('UpdatePasswordForm: onAuthStateChange disparado com evento:', event, 'e sessão:', session);
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log('UpdatePasswordForm: Evento PASSWORD_RECOVERY detectado!');
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      if (session && hash.includes('type=recovery')) {
+        console.log('UpdatePasswordForm: Sessão via AuthContext detectada no fluxo de recuperação. Formulário pronto.');
         setIsSessionReady(true);
+      } else if (!session && hash.includes('type=recovery')) {
+        console.log('UpdatePasswordForm: Fluxo de recuperação indicado pela URL, mas sem sessão do AuthContext ainda. Aguardando...');
+        setIsSessionReady(false); // Mantém "Aguarde..."
+      } else if (session && !hash.includes('type=recovery')) {
+        console.warn('UpdatePasswordForm: Sessão existe, mas URL não indica fluxo de recuperação. Acesso indevido?');
+        setError("Página de atualização de senha acessada fora do fluxo de recuperação.");
+        setIsSessionReady(false);
       } else {
-        console.log('UpdatePasswordForm: Evento recebido não é PASSWORD_RECOVERY:', event);
+        console.log('UpdatePasswordForm: Sem sessão do AuthContext ou não está no fluxo de recuperação.');
+        setIsSessionReady(false);
       }
-    });
-
-    // Verifica imediatamente se já existe uma sessão válida (embora para recovery, o evento seja mais importante)
-    // supabase.auth.getSession().then(({ data: { session } }) => {
-    //   console.log('UpdatePasswordForm: Sessão atual ao montar:', session);
-    //   // Se já houver uma sessão de usuário normal, talvez não seja o fluxo de recovery
-    // });
-
-    return () => {
-      console.log('UpdatePasswordForm: useEffect cleanup. Desinscrevendo authListener.');
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase]);
+    }
+  }, [session, supabase]);
 
   const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
