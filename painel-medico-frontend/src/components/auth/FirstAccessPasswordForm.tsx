@@ -35,31 +35,36 @@ export default function FirstAccessPasswordForm() {
   const [isFormActive, setIsFormActive] = useState(true); 
   const [isOnCorrectPath, setIsOnCorrectPath] = useState(() => isCorrectPathForPasswordForm());
 
-  // Timeout para mostrar mensagem de erro genérica se nada acontecer (o token pode ser inválido)
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
-    if (isOnCorrectPath && isFormActive && !success) { // Apenas ativa o timer se estivermos esperando interação
+    console.log('[DebugForm] useEffect for timeout triggered. Conditions:', { isOnCorrectPath, isFormActive, success, loading, error });
+    if (isOnCorrectPath && isFormActive && !success && !loading && !error) {
+      console.log('[DebugForm] Setting up timeout for link expiration message.');
       timer = setTimeout(() => {
-        if (!loading && !error && !success) { // Se o usuário não submeteu e não houve outro erro/sucesso
-          setError('O link pode ter expirado ou ser inválido. Se o problema persistir, contate o suporte.');
-          setIsFormActive(false); // Desativa o formulário
+        // Verifique novamente as condições DENTRO do timeout, pois o estado pode ter mudado
+        if (!loading && !error && !success && isFormActive) { 
+          console.log('[DebugForm] Timeout reached! Setting link expired error.');
+          setError('O link pode ter expirado ou ser inválido (timeout). Se o problema persistir, contate o suporte.');
+          setIsFormActive(false);
         }
-      }, 15000); // Aumentado para 15 segundos para dar tempo ao usuário
+      }, 30000); // Aumentado para 30 segundos
+    } else {
+      console.log('[DebugForm] Timeout not set or conditions not met.');
     }
-    return () => clearTimeout(timer);
+    return () => {
+      console.log('[DebugForm] Clearing timeout.');
+      clearTimeout(timer);
+    };
   }, [isOnCorrectPath, isFormActive, success, loading, error]);
 
 
   useEffect(() => {
-    // Este useEffect não depende mais de session/user para habilitar o formulário.
-    // A validação do token ocorre implicitamente na chamada `updateUser`.
-    // Se o componente está montado e na URL correta, consideramos pronto para uso.
-    console.log('FirstAccessPasswordForm: Mounted. Ready for password input.');
+    console.log('[DebugForm] Initial mount useEffect. isOnCorrectPath:', isOnCorrectPath);
     if (!isOnCorrectPath) {
+        console.log('[DebugForm] Path is incorrect, setting error and deactivating form.');
         setError("Página inválida para esta operação.");
         setIsFormActive(false);
     }
-
   }, [isOnCorrectPath]);
 
   const handleSetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -110,8 +115,12 @@ export default function FirstAccessPasswordForm() {
     } catch (err: unknown) {
       console.error('Set password error:', err);
       const message = err instanceof Error ? err.message : 'Ocorreu um erro ao tentar definir sua senha.';
+      console.error('[DebugForm] Error in handleSetPassword:', message);
       setError(message);
+      // Não desativar o formulário aqui, para que o usuário possa ver o erro e tentar novamente se for algo transitório
+      // setIsFormActive(false); 
     } finally {
+      console.log('[DebugForm] handleSetPassword finally block. Loading set to false.');
       setLoading(false);
     }
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Session, User, SupabaseClient, AuthChangeEvent } from '@supabase/supabase-js';
 
@@ -26,10 +26,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('%cAuthContext: useEffect mounting. Setting up onAuthStateChange listener.', 'color: purple; font-weight: bold;', {
-      initialHash: typeof window !== 'undefined' ? window.location.hash : 'N/A',
-      initialPath: typeof window !== 'undefined' ? window.location.pathname : 'N/A'
-    });
+    console.log('[AuthContext] useEffect mounting. Current URL hash:', window.location.hash); 
 
     let initialSessionLoaded = false;
 
