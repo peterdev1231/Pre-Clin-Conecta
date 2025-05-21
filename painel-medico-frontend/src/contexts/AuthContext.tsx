@@ -26,22 +26,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Temporariamente comentado para depurar o fluxo de PASSWORD_RECOVERY -- REVERTENDO
-    const getInitialSession = async () => {
-      try {
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-      } catch (error) {
-        console.error("Error getting initial session:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getInitialSession();
-
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       console.log(
         '%cAuthContext: onAuthStateChange Event Fired',
@@ -56,6 +40,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
     });
+
+    supabase.auth.getSession().then(({ data: { session: potentialRecoverySession } }) => {
+      console.log('%cAuthContext: Explicit getSession() called after onAuthStateChange setup.', 'color: green; font-weight: bold;', {
+        sessionFromGetSession: potentialRecoverySession,
+        currentHash: typeof window !== "undefined" ? window.location.hash : 'N/A'
+      });
+    });
+
+    const getInitialSession = async () => {
+      try {
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      } catch (error) {
+        console.error("Error getting initial session:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getInitialSession();
 
     return () => {
       authListener.subscription.unsubscribe();
