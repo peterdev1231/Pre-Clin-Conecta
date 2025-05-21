@@ -26,81 +26,69 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('[AuthContext] useEffect mounting. Current URL hash:', window.location.hash); 
+    console.log('[AuthContext] useEffect mounting. Current URL hash:', window.location.hash);
 
-    let initialSessionLoaded = false;
-
-    const handleAuthFlow = async () => {
-      console.log('%cAuthContext: handleAuthFlow called.', 'color: orange; font-weight: bold;');
-      try {
-        // Tenta obter a sessão. Isso pode processar o hash se presente.
-        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+    const processAuthHash = async () => {
+      console.log('%cAuthContext: processAuthHash called.', 'color: orange; font-weight: bold;');
+      if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
+        console.log('%cAuthContext: Hash com access_token detectado. Tentando supabase.auth.getSession().', 'color: orange; font-weight: bold;');
+        // A própria chamada a getSession e o onAuthStateChange deveriam lidar com o hash.
+        // O Supabase SDK é projetado para pegar o hash automaticamente.
+        // Vamos garantir que o loading seja gerenciado corretamente.
+        const { data: { session: sessionFromHashAttempt }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-          console.error('AuthContext: Error fetching session on handleAuthFlow:', sessionError);
+          console.error('AuthContext: Error fetching session in processAuthHash:', sessionError);
         }
-        
-        if (currentSession) {
-          console.log('%cAuthContext: Session established via getSession()', 'color: green; font-weight: bold;', currentSession);
-          setSession(currentSession);
-          setUser(currentSession.user);
-          initialSessionLoaded = true; // Marca que a sessão foi carregada
 
+        if (sessionFromHashAttempt) {
+          console.log('%cAuthContext: Session established via getSession() in processAuthHash', 'color: green; font-weight: bold;', sessionFromHashAttempt);
+          setSession(sessionFromHashAttempt);
+          setUser(sessionFromHashAttempt.user);
           // Limpar o hash DEPOIS de confirmar a sessão
-          if (typeof window !== 'undefined' && window.location.hash) {
-            const hash = window.location.hash;
-            // Simplificado para verificar access_token ou error, já que são os mais relevantes do magic link
-            if (hash.includes('access_token=') || hash.includes('error=')) { 
-              console.log('%cAuthContext: Clearing URL hash AFTER session from getSession():', 'color: orange; font-weight: bold;', hash);
-              history.replaceState(null, '', window.location.pathname + window.location.search);
-            }
+          if (window.location.hash) {
+            console.log('%cAuthContext: Clearing URL hash AFTER session from processAuthHash():', 'color: orange; font-weight: bold;', window.location.hash);
+            history.replaceState(null, '', window.location.pathname + window.location.search);
           }
         } else {
-          console.log('%cAuthContext: No session found via getSession().', 'color: orange;');
+          console.log('%cAuthContext: No session found via getSession() in processAuthHash.', 'color: orange;');
         }
-      } catch (err) {
-        console.error('AuthContext: Unexpected error in handleAuthFlow:', err);
-      } finally {
-        setLoading(false); // Define loading como false após a tentativa inicial
-        console.log('%cAuthContext: handleAuthFlow finished. Loading set to false.', 'color: orange;');
       }
+      setLoading(false); // Sempre define loading como false após a tentativa inicial
+      console.log('%cAuthContext: processAuthHash finished. Loading set to false.', 'color: orange;');
     };
 
-    // Chama handleAuthFlow na montagem para tentar processar o hash imediatamente
-    // handleAuthFlow(); // Comentado para testar com delay
+    processAuthHash(); // Chamar imediatamente na montagem
 
-    // Tentar com um pequeno delay
-    const timerId = setTimeout(() => {
-      console.log('%cAuthContext: Calling handleAuthFlow after a short delay (100ms).', 'color: orange; font-weight: bold;');
-      handleAuthFlow();
-    }, 100); // Delay de 100ms
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, sessionState) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, sessionState) => {
       console.log(
         '%cAuthContext: onAuthStateChange Event Fired',
         'color: blue; font-weight: bold;',
         {
           event: event,
-          sessionFromEvent: sessionState, // Logando a sessão do evento
+          sessionFromEvent: sessionState,
           hashAtEventTime: typeof window !== 'undefined' ? window.location.hash : "N/A",
           pathAtEventTime: typeof window !== 'undefined' ? window.location.pathname : "N/A"
         }
       );
 
-      // A sessão principal é atualizada por handleAuthFlow ou por este listener.
-      // Se initialSessionLoaded é true, significa que handleAuthFlow já tentou.
-      // Se sessionState for diferente da session atual, atualize.
-      // Esta lógica pode precisar de refinamento para evitar renders desnecessários,
-      // mas o objetivo principal é garantir que o estado reflita a sessão correta.
+      // Se o evento é INITIAL_SESSION ou SIGNED_IN e a sessão ainda é null,
+      // mas o hash existe, isso pode indicar que o SDK ainda não o processou.
+      // A chamada processAuthHash acima já tenta isso, mas vamos adicionar um log aqui.
+      if (!sessionState && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
+        console.warn('%cAuthContext: onAuthStateChange viu evento de login/inicial mas sessionState é null e hash presente. processAuthHash deveria ter lidado.', 'color: yellow; font-weight: bold;');
+        // Poderia chamar processAuthHash() novamente, mas pode causar loops.
+        // O SDK do Supabase deveria ter pego o hash.
+      }
 
       setSession(sessionState);
       setUser(sessionState?.user ?? null);
       
-      // Se setLoading(true) for chamado em signOut, precisamos de setLoading(false) aqui também.
-      // Mas handleAuthFlow já define como false. Se a sessão mudar DEPOIS de handleAuthFlow (ex: signOut),
-      // o loading já estaria false.
-      // Se um evento como TOKEN_REFRESHED ocorre, loading já deve ser false.
-      // Talvez não seja necessário mexer no loading aqui, a menos que um fluxo específico o exija.
+      // Se setLoading(true) foi chamado em signOut, setLoading(false) pode ser necessário se o evento for SIGNED_OUT
+      // No entanto, processAuthHash define loading como false.
+      if (event === 'SIGNED_OUT') {
+        setLoading(false); // Garante que o loading não fique preso se o signOut ocorrer.
+      }
 
       // Sua lógica de redirecionamento para /definir-senha baseada nos metadados do usuário
       if (event === 'SIGNED_IN' && sessionState) {
@@ -135,11 +123,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     });
 
-    // O initializeSession foi substituído por handleAuthFlow.
-    // Mantenha o setLoading(false) dentro do finally de handleAuthFlow.
-
     return () => {
-      clearTimeout(timerId); // Limpar o timeout ao desmontar
+      // clearTimeout(timerId); // Removido pois timerId foi removido
       console.log('%cAuthContext: useEffect unmounting. Unsubscribing authListener.', 'color: purple;');
       authListener.subscription.unsubscribe();
     };
