@@ -43,7 +43,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     getInitialSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      // console.log('AuthContext: onAuthStateChange event:', _event, 'session:', currentSession); // Log pode ser mantido ou removido
+      console.log(
+        '%cAuthContext: onAuthStateChange Event Fired',
+        'color: blue; font-weight: bold;',
+        {
+          event: _event,
+          session: currentSession,
+          hasAccessTokenInHash: typeof window !== "undefined" && window.location.hash.includes('access_token'),
+          hash: typeof window !== "undefined" ? window.location.hash : "N/A (server-side or no window)"
+        }
+      );
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
     });
