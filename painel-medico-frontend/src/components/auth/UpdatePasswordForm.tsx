@@ -6,11 +6,31 @@ import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation'; // Para redirecionamento
 import Link from 'next/link';
 
-// Tenta ler o hash o mais cedo possível, no escopo do módulo (apenas no cliente)
-let initialHashOnLoad = '';
-if (typeof window !== 'undefined') {
-  initialHashOnLoad = window.location.hash;
-  console.log('UpdatePasswordForm (Module Scope): Captured initial hash on load:', initialHashOnLoad);
+// Detecta se o fluxo é de recuperação de senha através do URL ou outras pistas
+function isRecoveryFlow() {
+  if (typeof window === 'undefined') return false;
+  
+  // Verifica o hash da URL (principal método)
+  const urlHash = window.location.hash;
+  if (urlHash && urlHash.includes('type=recovery')) {
+    console.log('Recovery flow detected from URL hash:', urlHash);
+    return true;
+  }
+  
+  // Verifica se há parâmetros na URL que indiquem recuperação
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('type') && urlParams.get('type') === 'recovery') {
+    console.log('Recovery flow detected from URL params');
+    return true;
+  }
+
+  // Verifica o caminho da URL
+  if (window.location.pathname.includes('/atualizar-senha')) {
+    console.log('On password update page, assuming recovery flow');
+    return true;
+  }
+  
+  return false;
 }
 
 export default function UpdatePasswordForm() {
@@ -24,67 +44,28 @@ export default function UpdatePasswordForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
   const [isSessionReady, setIsSessionReady] = useState(false);
-  // Usa o hash capturado no escopo do módulo para inicializar este estado
-  const [initialUrlIndicatedRecovery, setInitialUrlIndicatedRecovery] = useState(() => {
-    const indicated = initialHashOnLoad.includes('type=recovery');
-    console.log('UpdatePasswordForm (State Init): initialUrlIndicatedRecovery set to:', indicated, 'based on hash:', initialHashOnLoad);
-    return indicated;
-  });
-  // Adiciona um estado para controlar se já tentamos a re-verificação do hash
-  const [hashRecheckAttempted, setHashRecheckAttempted] = useState(false);
+  
+  // Assume como fluxo de recuperação se estiver na página correta
+  // Simplifica a lógica para evitar falsos negativos
+  const [isRecovery, setIsRecovery] = useState(() => isRecoveryFlow());
 
   useEffect(() => {
-    const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
-    let didUrlIndicateRecovery = initialUrlIndicatedRecovery;
-
-    // Se a verificação inicial do hash não indicou recuperação,
-    // mas uma sessão agora existe e ainda não tentamos re-verificar o hash atual.
-    // Isso é crucial porque o evento PASSWORD_RECOVERY no AuthContext pode já ter
-    // estabelecido a sessão baseada no hash, mesmo que nossa leitura inicial do hash tenha falhado.
-    if (!initialUrlIndicatedRecovery && session && !hashRecheckAttempted) {
-      const currentHashIndicatesRecovery = currentHash.includes('type=recovery');
-      console.log('UpdatePasswordForm (Effect - Recheck): Re-checking hash. Current hash:', currentHash, 'Indicates recovery:', currentHashIndicatesRecovery);
-      if (currentHashIndicatesRecovery) {
-        didUrlIndicateRecovery = true;
-        // Atualiza o estado para refletir que a URL realmente indicava recuperação
-        // e para evitar re-checagens desnecessárias.
-        // Embora initialUrlIndicatedRecovery seja usado nas dependências,
-        // a lógica agora usa didUrlIndicateRecovery para a decisão atual.
-        // Considerar renomear ou refatorar initialUrlIndicatedRecovery se isso se tornar complexo.
-        // Por enquanto, vamos manter a lógica focada em corrigir o problema imediato.
-      }
-      setHashRecheckAttempted(true); // Marcar que a re-verificação foi tentada
-    }
-
-    console.log('UpdatePasswordForm (Session/Recovery Check Effect): Evaluating form readiness.', {
+    console.log('UpdatePasswordForm: Checking recovery status', {
+      isRecovery,
       hasSession: !!session,
-      // Usar a variável didUrlIndicateRecovery que pode ter sido atualizada
-      didInitialUrlIndicateRecovery: didUrlIndicateRecovery,
-      currentHashAtCheckTime: currentHash
+      sessionDetails: session
     });
 
-    if (didUrlIndicateRecovery && session) {
-      console.log('UpdatePasswordForm: Recovery flow confirmed (possibly after recheck) AND session active. Formulário pronto.');
+    // Se temos sessão e estamos na página de atualização de senha, permitimos o fluxo
+    if (session && window.location.pathname.includes('/atualizar-senha')) {
+      console.log('UpdatePasswordForm: Session exists and we are on password update page - enabling form');
       setIsSessionReady(true);
       setError(null);
-    } else if (didUrlIndicateRecovery && !session) {
-      console.log('UpdatePasswordForm: URL indicated recovery, but no session from AuthContext yet. Aguardando...');
-      setIsSessionReady(false); // Continua aguardando a sessão
-    } else if (!didUrlIndicateRecovery && session) {
-      console.warn('UpdatePasswordForm: Session exists, but URL (even after recheck) did not indicate recovery flow.');
-      setError("Página de atualização de senha acessada fora do fluxo de recuperação ou o link expirou/foi modificado.");
+    } else if (!session) {
+      console.log('UpdatePasswordForm: Waiting for session to be established...');
       setIsSessionReady(false);
-    } else { // !didUrlIndicateRecovery && !session
-      console.log('UpdatePasswordForm: Not a recovery flow from URL and no session.');
-      setIsSessionReady(false);
-      // Só mostra erro sobre link inválido se a URL realmente não indicar recuperação
-      if (!didUrlIndicateRecovery) {
-         setError("Para definir uma nova senha, por favor, utilize um link de recuperação válido. O link pode ter sido usado, modificado ou a página foi acessada incorretamente.");
-      }
     }
-    // Adiciona session e hashRecheckAttempted às dependências.
-    // initialUrlIndicatedRecovery continua, pois sua mudança inicial também deve disparar o efeito.
-  }, [session, initialUrlIndicatedRecovery, hashRecheckAttempted]);
+  }, [session, isRecovery]);
 
   const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -168,13 +149,15 @@ export default function UpdatePasswordForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-3 pr-10 py-3 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:outline-none transition duration-150 ease-in-out shadow-sm hover:shadow-md"
+                disabled={!isSessionReady}
+                className="w-full pl-3 pr-10 py-3 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:outline-none transition duration-150 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Digite sua nova senha (mín. 6 caracteres)"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-teal-600 focus:outline-none p-1"
+                disabled={!isSessionReady}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-teal-600 focus:outline-none p-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -192,13 +175,15 @@ export default function UpdatePasswordForm() {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-3 pr-10 py-3 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:outline-none transition duration-150 ease-in-out shadow-sm hover:shadow-md"
+                disabled={!isSessionReady}
+                className="w-full pl-3 pr-10 py-3 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:outline-none transition duration-150 ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Confirme sua nova senha"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-teal-600 focus:outline-none p-1"
+                disabled={!isSessionReady}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-teal-600 focus:outline-none p-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label={showConfirmPassword ? 'Esconder senha' : 'Mostrar senha'}
               >
                 {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
