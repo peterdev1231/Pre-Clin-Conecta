@@ -27,7 +27,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     // Temporariamente comentado para depurar o fluxo de PASSWORD_RECOVERY -- REVERTENDO
-    // /*
     const getInitialSession = async () => {
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
@@ -52,9 +51,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       authListener.subscription.unsubscribe();
     };
-    // */
-    // console.log('AuthContext: Lógica de sessão inicial e listener temporariamente desabilitados para teste de PASSWORD_RECOVERY.');
-    // setLoading(false); // Garante que o loading não fique preso -- getInitialSession() já faz isso
   }, [supabase]);
 
   const signOut = async () => {
