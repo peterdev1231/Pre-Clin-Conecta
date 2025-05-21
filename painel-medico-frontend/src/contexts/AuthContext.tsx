@@ -31,9 +31,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       initialPath: typeof window !== 'undefined' ? window.location.pathname : 'N/A'
     });
 
-    let initialSessionLoaded = false; // Flag para controlar o carregamento inicial
+    let initialSessionLoaded = false;
 
-    // Função para tentar carregar a sessão e limpar o hash
     const handleAuthFlow = async () => {
       console.log('%cAuthContext: handleAuthFlow called.', 'color: orange; font-weight: bold;');
       try {
@@ -71,9 +70,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     // Chama handleAuthFlow na montagem para tentar processar o hash imediatamente
-    handleAuthFlow();
+    // handleAuthFlow(); // Comentado para testar com delay
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, sessionState) => { // Renomeado para sessionState para evitar conflito
+    // Tentar com um pequeno delay
+    const timerId = setTimeout(() => {
+      console.log('%cAuthContext: Calling handleAuthFlow after a short delay (100ms).', 'color: orange; font-weight: bold;');
+      handleAuthFlow();
+    }, 100); // Delay de 100ms
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, sessionState) => {
       console.log(
         '%cAuthContext: onAuthStateChange Event Fired',
         'color: blue; font-weight: bold;',
@@ -137,6 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Mantenha o setLoading(false) dentro do finally de handleAuthFlow.
 
     return () => {
+      clearTimeout(timerId); // Limpar o timeout ao desmontar
       console.log('%cAuthContext: useEffect unmounting. Unsubscribing authListener.', 'color: purple;');
       authListener.subscription.unsubscribe();
     };
