@@ -26,44 +26,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    console.log('%cAuthContext: useEffect mounting. Setting up onAuthStateChange listener.', 'color: purple; font-weight: bold;', {
+      initialHash: typeof window !== 'undefined' ? window.location.hash : 'N/A'
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(
         '%cAuthContext: onAuthStateChange Event Fired',
         'color: blue; font-weight: bold;',
         {
-          event: _event,
-          session: currentSession,
-          hasAccessTokenInHash: typeof window !== "undefined" && window.location.hash.includes('access_token'),
-          hash: typeof window !== "undefined" ? window.location.hash : "N/A (server-side or no window)"
+          event: event,
+          session: session,
+          hashAtEventTime: typeof window !== 'undefined' ? window.location.hash : "N/A"
         }
       );
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-    });
 
-    supabase.auth.getSession().then(({ data: { session: potentialRecoverySession } }) => {
-      console.log('%cAuthContext: Explicit getSession() called after onAuthStateChange setup.', 'color: green; font-weight: bold;', {
-        sessionFromGetSession: potentialRecoverySession,
-        currentHash: typeof window !== "undefined" ? window.location.hash : 'N/A'
-      });
-    });
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
 
-    const getInitialSession = async () => {
-      try {
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-      } catch (error) {
-        console.error("Error getting initial session:", error);
-      } finally {
-        setLoading(false);
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('%cAuthContext: PASSWORD_RECOVERY event detected!', 'color: green; font-weight: bold;', session);
       }
-    };
-
-    getInitialSession();
+    });
 
     return () => {
+      console.log('%cAuthContext: useEffect unmounting. Unsubscribing authListener.', 'color: purple;');
       authListener.subscription.unsubscribe();
     };
   }, [supabase]);
