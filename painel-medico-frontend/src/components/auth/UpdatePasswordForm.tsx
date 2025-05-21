@@ -30,33 +30,61 @@ export default function UpdatePasswordForm() {
     console.log('UpdatePasswordForm (State Init): initialUrlIndicatedRecovery set to:', indicated, 'based on hash:', initialHashOnLoad);
     return indicated;
   });
+  // Adiciona um estado para controlar se já tentamos a re-verificação do hash
+  const [hashRecheckAttempted, setHashRecheckAttempted] = useState(false);
 
   useEffect(() => {
+    const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
+    let didUrlIndicateRecovery = initialUrlIndicatedRecovery;
+
+    // Se a verificação inicial do hash não indicou recuperação,
+    // mas uma sessão agora existe e ainda não tentamos re-verificar o hash atual.
+    // Isso é crucial porque o evento PASSWORD_RECOVERY no AuthContext pode já ter
+    // estabelecido a sessão baseada no hash, mesmo que nossa leitura inicial do hash tenha falhado.
+    if (!initialUrlIndicatedRecovery && session && !hashRecheckAttempted) {
+      const currentHashIndicatesRecovery = currentHash.includes('type=recovery');
+      console.log('UpdatePasswordForm (Effect - Recheck): Re-checking hash. Current hash:', currentHash, 'Indicates recovery:', currentHashIndicatesRecovery);
+      if (currentHashIndicatesRecovery) {
+        didUrlIndicateRecovery = true;
+        // Atualiza o estado para refletir que a URL realmente indicava recuperação
+        // e para evitar re-checagens desnecessárias.
+        // Embora initialUrlIndicatedRecovery seja usado nas dependências,
+        // a lógica agora usa didUrlIndicateRecovery para a decisão atual.
+        // Considerar renomear ou refatorar initialUrlIndicatedRecovery se isso se tornar complexo.
+        // Por enquanto, vamos manter a lógica focada em corrigir o problema imediato.
+      }
+      setHashRecheckAttempted(true); // Marcar que a re-verificação foi tentada
+    }
+
     console.log('UpdatePasswordForm (Session/Recovery Check Effect): Evaluating form readiness.', {
       hasSession: !!session,
-      didInitialUrlIndicateRecovery: initialUrlIndicatedRecovery,
-      currentHashAtCheckTime: typeof window !== 'undefined' ? window.location.hash : 'N/A'
+      // Usar a variável didUrlIndicateRecovery que pode ter sido atualizada
+      didInitialUrlIndicateRecovery: didUrlIndicateRecovery,
+      currentHashAtCheckTime: currentHash
     });
 
-    if (initialUrlIndicatedRecovery && session) {
-      console.log('UpdatePasswordForm: Recovery flow confirmed by initial URL AND session active. Formulário pronto.');
+    if (didUrlIndicateRecovery && session) {
+      console.log('UpdatePasswordForm: Recovery flow confirmed (possibly after recheck) AND session active. Formulário pronto.');
       setIsSessionReady(true);
       setError(null);
-    } else if (initialUrlIndicatedRecovery && !session) {
-      console.log('UpdatePasswordForm: Initial URL was for recovery, but no session from AuthContext yet. Aguardando...');
-      setIsSessionReady(false);
-    } else if (!initialUrlIndicatedRecovery && session) {
-      console.warn('UpdatePasswordForm: Session exists, but initial URL did not indicate recovery flow.');
+    } else if (didUrlIndicateRecovery && !session) {
+      console.log('UpdatePasswordForm: URL indicated recovery, but no session from AuthContext yet. Aguardando...');
+      setIsSessionReady(false); // Continua aguardando a sessão
+    } else if (!didUrlIndicateRecovery && session) {
+      console.warn('UpdatePasswordForm: Session exists, but URL (even after recheck) did not indicate recovery flow.');
       setError("Página de atualização de senha acessada fora do fluxo de recuperação ou o link expirou/foi modificado.");
       setIsSessionReady(false);
-    } else {
-      console.log('UpdatePasswordForm: Not a recovery flow from initial URL and no session.');
+    } else { // !didUrlIndicateRecovery && !session
+      console.log('UpdatePasswordForm: Not a recovery flow from URL and no session.');
       setIsSessionReady(false);
-      if (!initialUrlIndicatedRecovery){
-        setError("Para definir uma nova senha, por favor, utilize um link de recuperação válido. O link pode ter sido usado ou modificado.");
+      // Só mostra erro sobre link inválido se a URL realmente não indicar recuperação
+      if (!didUrlIndicateRecovery) {
+         setError("Para definir uma nova senha, por favor, utilize um link de recuperação válido. O link pode ter sido usado, modificado ou a página foi acessada incorretamente.");
       }
     }
-  }, [session, initialUrlIndicatedRecovery]);
+    // Adiciona session e hashRecheckAttempted às dependências.
+    // initialUrlIndicatedRecovery continua, pois sua mudança inicial também deve disparar o efeito.
+  }, [session, initialUrlIndicatedRecovery, hashRecheckAttempted]);
 
   const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
