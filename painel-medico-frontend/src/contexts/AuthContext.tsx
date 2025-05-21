@@ -47,12 +47,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(session?.user ?? null);
       setLoading(false);
 
-      // Limpar o hash da URL se contiver informações de token/erro que já foram processadas
-      if (typeof window !== 'undefined' && window.location.hash) {
-        const hash = window.location.hash;
-        if (hash.includes('access_token=') || hash.includes('error=') || hash.includes('type=signup') || hash.includes('type=magiclink')) {
-          console.log('%cAuthContext: Clearing URL hash:', 'color: orange; font-weight: bold;', hash);
-          history.replaceState(null, '', window.location.pathname + window.location.search);
+      // APENAS limpe o hash se uma SESSÃO VÁLIDA foi estabelecida E o evento indica isso
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || (event === 'INITIAL_SESSION' && session))) {
+        if (typeof window !== 'undefined' && window.location.hash) {
+          const hash = window.location.hash;
+          if (hash.includes('access_token=') || hash.includes('error=') || hash.includes('type=signup') || hash.includes('type=magiclink')) {
+            console.log('%cAuthContext: Clearing URL hash AFTER session established:', 'color: orange; font-weight: bold;', hash);
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
         }
       }
 
