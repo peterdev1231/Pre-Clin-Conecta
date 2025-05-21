@@ -6,6 +6,13 @@ import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation'; // Para redirecionamento
 import Link from 'next/link';
 
+// Tenta ler o hash o mais cedo possível, no escopo do módulo (apenas no cliente)
+let initialHashOnLoad = '';
+if (typeof window !== 'undefined') {
+  initialHashOnLoad = window.location.hash;
+  console.log('UpdatePasswordForm (Module Scope): Captured initial hash on load:', initialHashOnLoad);
+}
+
 export default function UpdatePasswordForm() {
   const { supabase, session } = useAuth();
   const [password, setPassword] = useState('');
@@ -17,19 +24,12 @@ export default function UpdatePasswordForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
   const [isSessionReady, setIsSessionReady] = useState(false);
-  const [initialUrlIndicatedRecovery, setInitialUrlIndicatedRecovery] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const currentHash = window.location.hash;
-      if (currentHash.includes('type=recovery')) {
-        console.log('UpdatePasswordForm (Mount Effect): Initial URL indicates recovery flow. Hash:', currentHash);
-        setInitialUrlIndicatedRecovery(true);
-      } else {
-        console.log('UpdatePasswordForm (Mount Effect): Initial URL does NOT indicate recovery flow. Hash:', currentHash);
-      }
-    }
-  }, []);
+  // Usa o hash capturado no escopo do módulo para inicializar este estado
+  const [initialUrlIndicatedRecovery, setInitialUrlIndicatedRecovery] = useState(() => {
+    const indicated = initialHashOnLoad.includes('type=recovery');
+    console.log('UpdatePasswordForm (State Init): initialUrlIndicatedRecovery set to:', indicated, 'based on hash:', initialHashOnLoad);
+    return indicated;
+  });
 
   useEffect(() => {
     console.log('UpdatePasswordForm (Session/Recovery Check Effect): Evaluating form readiness.', {
@@ -46,16 +46,14 @@ export default function UpdatePasswordForm() {
       console.log('UpdatePasswordForm: Initial URL was for recovery, but no session from AuthContext yet. Aguardando...');
       setIsSessionReady(false);
     } else if (!initialUrlIndicatedRecovery && session) {
-      console.warn('UpdatePasswordForm: Session exists, but initial URL did not indicate recovery flow. Possible direct navigation or lost hash.');
+      console.warn('UpdatePasswordForm: Session exists, but initial URL did not indicate recovery flow.');
       setError("Página de atualização de senha acessada fora do fluxo de recuperação ou o link expirou/foi modificado.");
       setIsSessionReady(false);
     } else {
       console.log('UpdatePasswordForm: Not a recovery flow from initial URL and no session.');
       setIsSessionReady(false);
-      if (!initialUrlIndicatedRecovery && window.location.hash.includes('type=recovery')){
-          console.warn('UpdatePasswordForm: Discrepancy - current hash indicates recovery, but initial check did not (or state not updated yet).');
-      } else if (!initialUrlIndicatedRecovery){
-        setError("Para definir uma nova senha, por favor, utilize um link de recuperação válido.");
+      if (!initialUrlIndicatedRecovery){
+        setError("Para definir uma nova senha, por favor, utilize um link de recuperação válido. O link pode ter sido usado ou modificado.");
       }
     }
   }, [session, initialUrlIndicatedRecovery]);
