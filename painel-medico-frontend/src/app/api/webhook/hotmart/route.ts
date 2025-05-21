@@ -228,21 +228,10 @@ export async function POST(req: NextRequest) {
     });
 
     const { data: linkData, error: erroLink } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink', // Pode ser 'signup' se o usuário é novo, ou 'recovery' se já existe. Magiclink pode funcionar bem aqui.
-                         // Usar 'recovery' para garantir que funcione mesmo se o usuário já existir (para definir a senha inicial).
-                         // Ou usar 'invite' para novos usuários se quiser um fluxo de convite.
-                         // Para definir senha inicial, 'recovery' (se user já existe) ou um tipo especial como 'invite' ou 'magiclink'
-                         // com redirectTo para a página de definir senha é o ideal.
-                         // Vamos usar 'magiclink' pois é versátil e pode levar ao redirectTo para definir senha.
-                         // Se quiser forçar a definição de senha como parte do fluxo de signup, precisaria de um `redirectTo`
-                         // na criação do usuário ou um tipo de link específico.
-                         // 'recovery' é mais seguro se o usuário já existir.
-                         // Para um "primeiro acesso para definir senha", `type: 'magiclink'` com o `redirectTo` correto é uma boa abordagem.
-                         // Se o usuário acabou de ser criado, 'invite' pode ser mais semântico.
-                         // Vamos tentar com 'invite' para novos usuários e 'recovery' para existentes.
+      type: 'recovery', // Alterado para 'recovery'
       email: emailComprador,
       options: {
-        redirectTo: redirectUrl, // A página onde o usuário definirá a senha
+        redirectTo: redirectUrl, 
       }
     });
 
@@ -250,43 +239,16 @@ export async function POST(req: NextRequest) {
       console.error('[Hotmart Webhook] Erro ao gerar link de definição de senha:', erroLink);
       return NextResponse.json({ error: `Falha ao gerar link: ${erroLink.message}` }, { status: 500 });
     }
-    let linkDefinicaoSenha = linkData.properties?.action_link; // O nome da propriedade pode variar um pouco, verifique a doc ou o objeto retornado
-    if (!linkDefinicaoSenha && linkData.user && linkData.user.confirmation_sent_at) {
-        // Se foi 'invite' e já mandou, ou outro tipo que envia automaticamente,
-        // pode ser que não retorne o action_link diretamente aqui,
-        // mas sim que o Supabase já enviou um e-mail.
-        // Precisamos garantir que estamos gerando um link para NOSSO e-mail.
-        // Para o nosso email personalizado, precisamos do link explícito.
-        // Re-tentando com 'recovery' se 'invite' não deu link direto para nosso uso
-        // Ou melhor, vamos usar um tipo que com certeza nos dê o link para o email.
-        // `generateLink` com `type: 'magiclink'` ou `type: 'recovery'` deveria dar o `action_link`.
-        // Se estamos criando o usuário acima, e ele não tem senha, o `magiclink` para `redirectTo` à página de definir senha é bom.
-
-        // Simplificando: usar `type: 'magiclink'` e garantir que o `redirectTo` leve para a página certa.
-        // Ou, para ser mais explícito sobre "definir senha pela primeira vez",
-        // considere se o Supabase tem um tipo específico para "convite para definir senha".
-        // Por enquanto, `magiclink` com `redirectTo` para `/definir-senha` deve funcionar.
-        // Ajuste o tipo se necessário para o fluxo exato (primeiro acesso vs. recuperação).
-        // Para primeiro acesso, talvez o `type: 'invite'` seria ideal se quisermos que o Supabase envie o e-mail
-        // mas como queremos enviar nosso próprio e-mail, precisamos do link.
-
-        // Vamos refazer a geração do link para ser mais robusto para obter o action_link
-        const { data: linkDataRetry, error: erroLinkRetry } = await supabaseAdmin.auth.admin.generateLink({
-            type: 'magiclink', // Magiclink é uma boa opção para levar o usuário à página de definir senha.
-            email: emailComprador,
-            options: { redirectTo: redirectUrl }
-        });
-        if (erroLinkRetry) {
-            console.error('[Hotmart Webhook] Erro ao gerar link de definição de senha (retry):', erroLinkRetry);
-            return NextResponse.json({ error: `Falha ao gerar link: ${erroLinkRetry.message}` }, { status: 500 });
-        }
-        linkDefinicaoSenha = linkDataRetry.properties?.action_link;
-    }
-
+    // Acessar diretamente o action_link da primeira tentativa.
+    // O nome da propriedade é 'action_link' para 'recovery' e 'magiclink' quando gerados via admin.generateLink
+    // e 'confirmation_url' para 'signup' quando se espera que o Supabase envie o email.
+    // Para type: 'recovery', esperamos 'action_link'.
+    const linkDefinicaoSenha = linkData.properties?.action_link;
 
     if (!linkDefinicaoSenha) {
-      console.error('[Hotmart Webhook] Não foi possível obter o action_link para definição de senha.');
-      return NextResponse.json({ error: 'Falha ao obter link de definição de senha.' }, { status: 500 });
+      console.error('[Hotmart Webhook] Não foi possível obter o action_link para definição de senha a partir do linkData:', linkData);
+      // Logar o objeto linkData inteiro pode ajudar a entender o que está sendo retornado se action_link estiver ausente.
+      return NextResponse.json({ error: 'Falha ao obter link de definição de senha do objeto retornado.' }, { status: 500 });
     }
     console.log(`[Hotmart Webhook] Link de definição de senha gerado: ${linkDefinicaoSenha}`);
 

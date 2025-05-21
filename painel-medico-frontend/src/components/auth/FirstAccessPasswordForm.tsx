@@ -7,19 +7,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 // Detecta se o fluxo é de primeiro acesso pelo URL
-function isFirstAccessFlow() {
+function isCorrectPathForPasswordForm() {
   if (typeof window === 'undefined') return false;
   
-  // Verifica se há parâmetros na URL que indiquem que é um link de signup
-  const urlHash = window.location.hash;
-  if (urlHash && urlHash.includes('type=signup')) {
-    console.log('First access flow detected from URL hash:', urlHash);
-    return true;
-  }
-  
   // Verifica o caminho da URL
-  if (window.location.pathname.includes('/definir-senha')) {
-    console.log('On first access page, assuming first access flow');
+  // Este formulário agora serve para qualquer cenário onde a URL o chama para definir/atualizar senha via token no hash.
+  if (window.location.pathname.includes('/definir-senha') || window.location.pathname.includes('/atualizar-senha')) {
+    console.log('Password form page loaded, assuming password set/update flow via URL token.');
     return true;
   }
   
@@ -27,7 +21,7 @@ function isFirstAccessFlow() {
 }
 
 export default function FirstAccessPasswordForm() {
-  const { supabase, session, user } = useAuth();
+  const { supabase } = useAuth(); // Removido session e user, pois não dependeremos deles inicialmente
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -36,56 +30,37 @@ export default function FirstAccessPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
-  const [isSessionReady, setIsSessionReady] = useState(false);
-  const [isFirstAccess, setIsFirstAccess] = useState(false);
   
-  // Verificar se é um fluxo de primeiro acesso
-  const [isFirstAccessDetected, setIsFirstAccessDetected] = useState(() => isFirstAccessFlow());
+  // Estado para controlar se o formulário deve estar ativo. Inicialmente true.
+  const [isFormActive, setIsFormActive] = useState(true); 
+  const [isOnCorrectPath, setIsOnCorrectPath] = useState(() => isCorrectPathForPasswordForm());
 
-  // Timeout para mostrar mensagem de erro se o token expirou
+  // Timeout para mostrar mensagem de erro genérica se nada acontecer (o token pode ser inválido)
   useEffect(() => {
-    if (isFirstAccessDetected && !session) {
-      const timer = setTimeout(() => {
-        setError('O link de ativação expirou ou já foi utilizado. Por favor, solicite um novo link.');
-      }, 5000);
-      
-      return () => clearTimeout(timer);
+    let timer: NodeJS.Timeout | undefined;
+    if (isOnCorrectPath && isFormActive && !success) { // Apenas ativa o timer se estivermos esperando interação
+      timer = setTimeout(() => {
+        if (!loading && !error && !success) { // Se o usuário não submeteu e não houve outro erro/sucesso
+          setError('O link pode ter expirado ou ser inválido. Se o problema persistir, contate o suporte.');
+          setIsFormActive(false); // Desativa o formulário
+        }
+      }, 15000); // Aumentado para 15 segundos para dar tempo ao usuário
     }
-  }, [isFirstAccessDetected, session]);
+    return () => clearTimeout(timer);
+  }, [isOnCorrectPath, isFormActive, success, loading, error]);
+
 
   useEffect(() => {
-    console.log('FirstAccessPasswordForm: Checking session status', {
-      isFirstAccessDetected,
-      hasSession: !!session,
-      sessionDetails: session,
-      userMetadata: user?.user_metadata
-    });
-
-    // Se temos sessão, verificamos o status nos metadados
-    if (session && user) {
-      const metadata = user.user_metadata || {};
-      const userStatus = metadata.status || 'unknown';
-      
-      if (userStatus === 'awaiting_first_access' || !metadata.first_access_completed_at) {
-        console.log('FirstAccessPasswordForm: User needs to set first password');
-        setIsFirstAccess(true);
-        setIsSessionReady(true);
-        setError(null);
-      } else if (userStatus === 'active' || metadata.first_access_completed_at) {
-        console.log('FirstAccessPasswordForm: User already set password before');
-        setIsFirstAccess(false);
-        setError('Sua senha já foi definida anteriormente. Para redefinir sua senha, use a opção "Esqueci minha senha".');
-      } else {
-        // Se não há status definido, mas temos sessão, permitimos o fluxo
-        console.log('FirstAccessPasswordForm: No status found but session exists - enabling form');
-        setIsFirstAccess(true);
-        setIsSessionReady(true);
-      }
-    } else if (!session) {
-      console.log('FirstAccessPasswordForm: Waiting for session to be established...');
-      setIsSessionReady(false);
+    // Este useEffect não depende mais de session/user para habilitar o formulário.
+    // A validação do token ocorre implicitamente na chamada `updateUser`.
+    // Se o componente está montado e na URL correta, consideramos pronto para uso.
+    console.log('FirstAccessPasswordForm: Mounted. Ready for password input.');
+    if (!isOnCorrectPath) {
+        setError("Página inválida para esta operação.");
+        setIsFormActive(false);
     }
-  }, [session, user, isFirstAccessDetected]);
+
+  }, [isOnCorrectPath]);
 
   const handleSetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -126,9 +101,10 @@ export default function FirstAccessPasswordForm() {
         // Não impedimos o fluxo se apenas os metadados falharem
       }
 
-      setSuccess('Senha definida com sucesso! Você será redirecionado para o painel em alguns segundos.');
+      setSuccess('Senha definida com sucesso! Você será redirecionado para a página de login.');
+      setIsFormActive(false); // Desativa o formulário após sucesso
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push('/login'); // Alterado para redirecionar para /login
       }, 3000);
 
     } catch (err: unknown) {
@@ -150,13 +126,6 @@ export default function FirstAccessPasswordForm() {
         <p className="mt-2 text-gray-600">Bem-vindo! Defina sua senha para acessar sua conta.</p>
       </div>
 
-      {!isSessionReady && !error && !success && (
-        <div className="flex items-center p-3.5 text-sm text-blue-700 bg-blue-100 rounded-lg border border-blue-300" role="alert">
-          <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-          <span className="font-medium">Aguarde, preparando formulário para definição de senha...</span>
-        </div>
-      )}
-
       {error && (
         <div className="flex items-center p-3.5 text-sm text-red-700 bg-red-100 rounded-lg border border-red-300" role="alert">
           <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
@@ -164,14 +133,7 @@ export default function FirstAccessPasswordForm() {
         </div>
       )}
 
-      {success && (
-        <div className="flex items-center p-3.5 text-sm text-green-700 bg-green-100 rounded-lg border border-green-300" role="alert">
-          <CheckCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-          <span className="font-medium">{success}</span>
-        </div>
-      )}
-
-      {!success && !error && isSessionReady && isFirstAccess && (
+      {!success && isFormActive && (
         <form onSubmit={handleSetPassword} className="space-y-6">
           <div>
             <label htmlFor="newPassword" className="sr-only">Nova Senha</label>
@@ -245,18 +207,23 @@ export default function FirstAccessPasswordForm() {
 
       {success && (
          <p className="mt-6 text-center text-sm text-gray-600">
-            Redirecionando para o dashboard em alguns segundos...
+            Redirecionando para a página de login em alguns segundos...
         </p>
       )}
 
-      {error && (
+      {!isFormActive && !success && !error && (
          <p className="mt-6 text-center text-sm text-gray-600">
-            <Link href="/login" className="font-medium text-teal-600 hover:text-teal-500 hover:underline">
-              Voltar para o login
-            </Link>
+            Não é possível definir a senha no momento. <Link href="/login" className="font-medium text-teal-600 hover:text-teal-500">Voltar para o login</Link>.
         </p>
       )}
 
+      {(!isFormActive || success || error) && !loading && (
+          <div className="mt-8 text-center">
+            <Link href="/login" className="font-medium text-teal-600 hover:text-teal-500 hover:underline">
+              Ir para Login
+            </Link>
+          </div>
+      )}
     </div>
   );
 } 
