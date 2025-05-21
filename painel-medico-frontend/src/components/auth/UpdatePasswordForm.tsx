@@ -6,35 +6,32 @@ import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation'; // Para redirecionamento
 import Link from 'next/link';
 
-// Detecta se o fluxo é de recuperação de senha através do URL ou outras pistas
-function isRecoveryFlow() {
-  if (typeof window === 'undefined') return false;
+// Detecta se o fluxo é de recuperação de senha ou primeiro acesso através do URL ou outras pistas
+function detectAuthFlow() {
+  if (typeof window === 'undefined') return { isRecovery: false, isFirstAccess: false };
   
   // Verifica o hash da URL (principal método)
   const urlHash = window.location.hash;
-  if (urlHash && urlHash.includes('type=recovery')) {
-    console.log('Recovery flow detected from URL hash:', urlHash);
-    return true;
-  }
   
-  // Verifica se há parâmetros na URL que indiquem recuperação
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has('type') && urlParams.get('type') === 'recovery') {
-    console.log('Recovery flow detected from URL params');
-    return true;
-  }
-
-  // Verifica o caminho da URL
-  if (window.location.pathname.includes('/atualizar-senha')) {
-    console.log('On password update page, assuming recovery flow');
-    return true;
-  }
+  // Verificar se é recuperação de senha
+  const isRecovery = urlHash.includes('type=recovery');
   
-  return false;
+  // Verificar se é primeiro acesso - poderia estar na URL como data ou apenas verificar metadados depois
+  const isFirstAccess = urlHash.includes('flow_type=first_access') || 
+                       (urlHash.includes('type=recovery') && window.location.pathname.includes('/atualizar-senha'));
+  
+  console.log('Auth flow detection:', {
+    urlHash,
+    isRecovery,
+    isFirstAccess,
+    path: window.location.pathname
+  });
+  
+  return { isRecovery, isFirstAccess };
 }
 
 export default function UpdatePasswordForm() {
-  const { supabase, session } = useAuth();
+  const { supabase, session, user } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,27 +42,53 @@ export default function UpdatePasswordForm() {
   const router = useRouter();
   const [isSessionReady, setIsSessionReady] = useState(false);
   
-  // Assume como fluxo de recuperação se estiver na página correta
-  // Simplifica a lógica para evitar falsos negativos
-  const [isRecovery, setIsRecovery] = useState(() => isRecoveryFlow());
+  // Detecta o tipo de fluxo (recuperação ou primeiro acesso)
+  const { isRecovery, isFirstAccess: initialIsFirstAccess } = detectAuthFlow();
+  const [isFirstAccess, setIsFirstAccess] = useState(initialIsFirstAccess);
 
   useEffect(() => {
-    console.log('UpdatePasswordForm: Checking recovery status', {
+    console.log('UpdatePasswordForm: Checking auth flow status', {
       isRecovery,
+      isFirstAccess,
       hasSession: !!session,
-      sessionDetails: session
+      sessionDetails: session,
+      userMetadata: user?.user_metadata
     });
 
-    // Se temos sessão e estamos na página de atualização de senha, permitimos o fluxo
+    // Função para verificar se é primeiro acesso baseado nos metadados do usuário
+    function checkFirstAccessFromMetadata() {
+      if (!user) return false;
+      
+      const metadata = user.user_metadata || {};
+      const isAwaitingFirstAccess = metadata.status === 'awaiting_first_access';
+      const hasNotCompletedFirstAccess = !metadata.first_access_completed_at;
+      
+      console.log('Checking first access from metadata:', {
+        status: metadata.status,
+        first_access_completed_at: metadata.first_access_completed_at,
+        isAwaitingFirstAccess,
+        hasNotCompletedFirstAccess
+      });
+      
+      return isAwaitingFirstAccess || hasNotCompletedFirstAccess;
+    }
+
+    // Se temos sessão e estamos na página de atualização de senha, verificamos se é primeiro acesso
     if (session && window.location.pathname.includes('/atualizar-senha')) {
-      console.log('UpdatePasswordForm: Session exists and we are on password update page - enabling form');
+      const isUserFirstAccess = checkFirstAccessFromMetadata();
+      
+      console.log('UpdatePasswordForm: Session exists and we are on password update page', {
+        isUserFirstAccess
+      });
+      
+      setIsFirstAccess(isUserFirstAccess);
       setIsSessionReady(true);
       setError(null);
     } else if (!session) {
       console.log('UpdatePasswordForm: Waiting for session to be established...');
       setIsSessionReady(false);
     }
-  }, [session, isRecovery]);
+  }, [session, user, isRecovery, isFirstAccess]);
 
   const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -86,16 +109,39 @@ export default function UpdatePasswordForm() {
     }
 
     try {
+      // Atualizar a senha
       const { error: updateError } = await supabase.auth.updateUser({ password });
 
       if (updateError) {
         throw updateError;
       }
 
-      setSuccess('Senha atualizada com sucesso! Você já pode fazer login com sua nova senha.');
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
+      // Se for primeiro acesso, atualizar os metadados do usuário
+      if (isFirstAccess) {
+        // Atualizar os metadados do usuário
+        const { error: metadataError } = await supabase.auth.updateUser({
+          data: {
+            status: 'active',
+            first_access_completed_at: new Date().toISOString()
+          }
+        });
+
+        if (metadataError) {
+          console.warn('Erro ao atualizar metadados do usuário:', metadataError);
+          // Não impedimos o fluxo se apenas os metadados falharem
+        }
+
+        setSuccess('Senha definida com sucesso! Você será redirecionado para o painel em alguns segundos.');
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 3000);
+      } else {
+        // Fluxo normal de redefinição de senha
+        setSuccess('Senha atualizada com sucesso! Você já pode fazer login com sua nova senha.');
+        setTimeout(() => {
+          router.push('/login');
+        }, 3000);
+      }
 
     } catch (err: unknown) {
       console.error('Update password error:', err);
@@ -113,7 +159,11 @@ export default function UpdatePasswordForm() {
           <Lock className="w-10 h-10" />
         </div>
         <h1 className="text-3xl font-bold text-gray-800">Definir Nova Senha</h1>
-        <p className="mt-2 text-gray-600">Crie uma nova senha para sua conta.</p>
+        <p className="mt-2 text-gray-600">
+          {isFirstAccess 
+            ? "Bem-vindo! Defina sua senha para acessar sua conta."
+            : "Crie uma nova senha para sua conta."}
+        </p>
       </div>
 
       {!isSessionReady && !error && !success && (
@@ -203,10 +253,10 @@ export default function UpdatePasswordForm() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Atualizando...
+                  {isFirstAccess ? 'Definindo...' : 'Atualizando...'}
                 </>
               ) : (
-                'Atualizar Senha'
+                isFirstAccess ? 'Definir Senha' : 'Atualizar Senha'
               )}
             </button>
           </div>
@@ -215,11 +265,13 @@ export default function UpdatePasswordForm() {
 
       {success && (
          <p className="mt-6 text-center text-sm text-gray-600">
-            Redirecionando para o login em alguns segundos...
+            {isFirstAccess 
+              ? "Redirecionando para o dashboard em alguns segundos..."
+              : "Redirecionando para o login em alguns segundos..."}
         </p>
       )}
 
-      {!success && error && (
+      {!success && error && !isFirstAccess && (
          <p className="mt-6 text-center text-sm text-gray-600">
             Problemas? Tente <Link href="/recuperar-senha" className="font-medium text-teal-600 hover:text-teal-500 hover:underline">solicitar um novo link</Link>.
         </p>
