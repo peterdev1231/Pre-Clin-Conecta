@@ -27,7 +27,7 @@ const inter = Inter({
 // });
 
 export const metadata: Metadata = {
-  title: "Painel Médico - Pré-Consulta",
+  title: "PréClin Conecta",
   description: "Gerenciamento de pré-consultas médicas",
 };
 

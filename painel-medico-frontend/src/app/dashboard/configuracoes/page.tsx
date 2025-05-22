@@ -399,6 +399,31 @@ export default function ConfiguracoesPage() {
                   </p>
                 )}
 
+                {/* Progress bar for Trial */}
+                {subscription.status_assinatura === 'trial' && subscription.data_inicio_assinatura && subscription.data_expiracao_acesso && (
+                  <div className="mt-4 w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                    {(() => {
+                      const startDate = new Date(subscription.data_inicio_assinatura).getTime();
+                      const expiryDate = new Date(subscription.data_expiracao_acesso).getTime();
+                      const now = Date.now();
+                      const totalDuration = expiryDate - startDate;
+                      const elapsed = now - startDate;
+                      const percentage = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+                      const remainingPercentage = 100 - percentage; // Percentage of trial remaining
+
+                      return (
+                         <div 
+                            className="bg-[#00A651] h-2.5 rounded-full"
+                            style={{ width: `${remainingPercentage}%` }}
+                            aria-valuenow={remainingPercentage}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                          ></div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {subscription.status_assinatura === 'ativo' && subscription.data_expiracao_acesso && (
                    <p className="text-base">
                      <span className="font-medium text-slate-700 dark:text-slate-300">Próxima cobrança em:</span>{' '}

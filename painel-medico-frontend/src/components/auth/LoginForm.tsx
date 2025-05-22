@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'; // Ícones
 import Link from 'next/link'; // Importar Link para navegação
 import { useRouter } from 'next/navigation'; // Importar useRouter
+import Image from 'next/image'; // Import next/image
 
 export default function LoginForm() {
   const { supabase } = useAuth();
@@ -53,15 +54,14 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-md p-8 space-y-6 sm:space-y-8 bg-white dark:bg-slate-800 rounded-xl shadow-2xl">
       <div className="text-center">
-        <div className="mb-6 inline-flex flex-col items-center">
-          {/* SVG do estetoscópio */}
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 text-[#00A651] dark:text-[#00C25D]" aria-hidden="true">
-            <path d="M11 2v2"></path><path d="M5 2v2"></path><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"></path><path d="M8 15a6 6 0 0 0 12 0v-3"></path><circle cx="20" cy="10" r="2"></circle>
-          </svg>
-          {/* Texto do Logo */}
-          <span className="text-2xl font-semibold text-[#25392C] dark:text-slate-100 mt-2">
-            PréClin<span className="font-light">Conecta</span>
-          </span>
+        <div className="mb-6 flex justify-center">
+           <Image
+             src="/Preclin conecta.png"
+             alt="PréClin Conecta Logo"
+             width={88}
+             height={88}
+             className="w-[88px] h-[88px]"
+           />
         </div>
         <h1 className="text-3xl font-bold text-[#25392C] dark:text-slate-100">Bem-vindo(a) de volta!</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-400">Faça login para acessar seu painel.</p>

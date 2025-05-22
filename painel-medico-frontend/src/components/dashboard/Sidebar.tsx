@@ -14,8 +14,7 @@ import {
   UserCircle2,
   X as XIcon, // Ícone para fechar o menu mobile
 } from 'lucide-react';
-import Image from 'next/image'; // Adicionando o import de Image de volta
-import CustomLogoIcon from '../icons/CustomLogoIcon'; // Importar o novo ícone
+import Image from 'next/image';
 
 // Define a type for MainContentView, mirroring DashboardLayout
 type MainContentView = 'default' | 'statistics';
@@ -76,11 +75,14 @@ export default function Sidebar({
     >
       {/* Cabeçalho da Sidebar com Logo e Botão de Fechar (mobile) */}
       <div className="h-20 flex items-center justify-between px-4 border-b border-[#3A5A40]">
-        <Link href="/dashboard" onClick={() => setCurrentView('default')} className="flex items-center space-x-2.5 text-xl font-semibold text-[#C4E8C9] hover:text-white transition-colors">
-          <CustomLogoIcon className="w-8 h-8 text-[#C4E8C9]" />
-          <span>
-            PréClin <span className="font-light">Conecta</span>
-          </span>
+        <Link href="/dashboard" onClick={() => setCurrentView('default')} className="flex items-center justify-center w-full text-xl font-semibold text-[#C4E8C9] hover:text-white transition-colors">
+          <Image
+            src="/Preclin conecta.png"
+            alt="PréClin Conecta Logo"
+            width={88}
+            height={88}
+            className="w-[88px] h-[88px]"
+          />
         </Link>
         <button 
           type="button"
