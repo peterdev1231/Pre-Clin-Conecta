@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AuthOtpResponse } from '@supabase/supabase-js';
 
 // Detecta se o fluxo é de primeiro acesso pelo URL
 function isCorrectPathForPasswordForm() {
@@ -18,6 +19,19 @@ function isCorrectPathForPasswordForm() {
   }
   
   return false;
+}
+
+// Função para extrair o token de acesso e o tipo da URL (REINTRODUZIDA)
+function getTokenInfoFromUrl() {
+  if (typeof window === 'undefined') return { accessToken: null, tokenType: null, refreshToken: null, expiresIn: null };
+  
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  return {
+    accessToken: hashParams.get('access_token'),
+    tokenType: hashParams.get('type'),
+    refreshToken: hashParams.get('refresh_token'), // Capturar se presente
+    expiresIn: hashParams.get('expires_in'),     // Capturar se presente
+  };
 }
 
 export default function FirstAccessPasswordForm() {
@@ -34,6 +48,13 @@ export default function FirstAccessPasswordForm() {
   // Estado para controlar se o formulário deve estar ativo. Inicialmente true.
   const [isFormActive, setIsFormActive] = useState(true); 
   const [isOnCorrectPath, setIsOnCorrectPath] = useState(() => isCorrectPathForPasswordForm());
+  
+  // Estados para accessToken e tokenType (REINTRODUZIDOS)
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [tokenType, setTokenType] = useState<string | null>(null);
+  // refreshToken e expiresIn podem ser úteis para debug ou contextos futuros, mas não são usados diretamente em verifyOtp.
+  // const [refreshToken, setRefreshToken] = useState<string | null>(null); 
+  // const [expiresIn, setExpiresIn] = useState<string | null>(null);
 
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -67,6 +88,38 @@ export default function FirstAccessPasswordForm() {
     }
   }, [isOnCorrectPath]);
 
+  // Extrair o token ao montar o componente (REINTRODUZIDO E AJUSTADO)
+  useEffect(() => {
+    const { accessToken: token, tokenType: type, refreshToken: rToken, expiresIn: expIn } = getTokenInfoFromUrl();
+    console.log('[DebugForm] Token info extracted:', { 
+      hasToken: !!token, // Simplificado
+      tokenType: type,
+      hasRefreshToken: !!rToken,
+      expiresIn: expIn
+    });
+    
+    setAccessToken(token);
+    setTokenType(type);
+    // setRefreshToken(rToken); 
+    // setExpiresIn(expIn);
+    
+    if (!token && isOnCorrectPath) { // Se não temos token e estamos na página correta
+      setError('Token de acesso não encontrado na URL. Por favor, use o link completo enviado para o seu email.');
+      setIsFormActive(false); // Desativa o formulário
+      // Limpar hash para não confundir o usuário ou expor token inválido/ausente
+      if (typeof window !== 'undefined') {
+        history.replaceState(null, '', window.location.pathname);
+      }
+    } else if (token && type !== 'recovery' && isOnCorrectPath) {
+      // Se temos um token, mas não é do tipo 'recovery', isso pode ser um problema.
+      // Para o fluxo de definir-senha, esperamos 'recovery'.
+      console.warn('[DebugForm] Token encontrado, mas não é do tipo "recovery". Tipo recebido:', type);
+      // Poderia-se adicionar um setError aqui se outros tipos não são esperados/tratados.
+      // setError('O link utilizado não é válido para recuperação de senha. Verifique o link ou contate o suporte.');
+      // setIsFormActive(false);
+    }
+  }, [isOnCorrectPath]); // Dependência apenas em isOnCorrectPath para rodar na montagem e se o path mudar
+
   const handleSetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -86,24 +139,77 @@ export default function FirstAccessPasswordForm() {
     }
 
     try {
-      // Atualizar a senha
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-
-      if (updateError) {
-        throw updateError;
+      // Verificar se temos o token de acesso
+      if (!accessToken) {
+        // Esta verificação agora deve ser mais robusta devido ao useEffect acima
+        setError('Token de acesso não está disponível. O link pode ser inválido ou ter expirado.');
+        setLoading(false);
+        return;
       }
 
-      // Atualizar os metadados do usuário
-      const { error: metadataError } = await supabase.auth.updateUser({
-        data: {
-          status: 'active',
-          first_access_completed_at: new Date().toISOString()
+      // Este formulário é para 'recovery' ou 'invite' type tokens.
+      if (tokenType !== 'recovery' && tokenType !== 'invite') {
+        console.error(`[DebugForm] Tipo de token inválido para esta página: '${tokenType}'. Esperado 'recovery' ou 'invite'.`);
+        setError('Link inválido ou tipo de token não suportado para esta operação. Por favor, use o link correto.');
+        setLoading(false);
+        return;
+      }
+      
+      const otpParams = {
+        token: accessToken!, 
+        type: tokenType as 'recovery' | 'invite', // Usar o tokenType validado
+      };
+      
+      console.log(`[DebugForm] Attempting to verify OTP with params:`, otpParams);
+      
+      // Usar verifyOtp para consumir o token de recuperação e estabelecer a sessão
+      // @ts-ignore -- Mantendo temporariamente SE o usuário confirmar que o erro de tipo persiste após limpeza
+      const { data, error: otpError } = await supabase.auth.verifyOtp(otpParams);
+
+      // A resposta (data) deve ser do tipo AuthOtpResponse
+      // O tipo de 'data' retornado por verifyOtp já é AuthOtpResponse['data'] | null
+      // então um cast direto para AuthOtpResponse['data'] pode não ser ideal se for null.
+      // Vamos verificar data antes de acessar suas propriedades.
+
+      if (otpError) {
+        console.error('[DebugForm] Error verifying OTP:', otpError);
+        let detailedErrorMessage = otpError.message;
+        if ((otpError as any).source) { 
+            detailedErrorMessage += ` (Source: ${JSON.stringify((otpError as any).source)})`;
         }
+        setError(`Falha ao verificar o token: ${detailedErrorMessage}`);
+        setLoading(false);
+        return; 
+      }
+
+      // Verificar se data e data.session existem
+      if (!data || !data.session) {
+        console.error('[DebugForm] OTP verified but no session returned in data:', data);
+        setError('Não foi possível estabelecer uma sessão após verificar o token. Verifique o console para detalhes.');
+        setLoading(false);
+        return;
+      }
+      
+      // Agora data e data.session são conhecidos por existirem
+      console.log('[DebugForm] OTP verified, session established. User:', data.user);
+      console.log('[DebugForm] Session details:', data.session);
+      console.log('[DebugForm] Now attempting to update password');
+
+      // Agora, com a sessão estabelecida por verifyOtp, updateUser deve funcionar
+      const { error: updateError } = await supabase.auth.updateUser({ 
+        password
       });
 
-      if (metadataError) {
-        console.warn('Erro ao atualizar metadados do usuário:', metadataError);
-        // Não impedimos o fluxo se apenas os metadados falharem
+      if (updateError) {
+        console.error('[DebugForm] Error updating password after OTP verification:', updateError);
+        // Adicionar mais detalhes do erro se disponíveis:
+        let detailedUpdateErrorMessage = updateError.message;
+        if ((updateError as any).source) { 
+            detailedUpdateErrorMessage += ` (Source: ${JSON.stringify((updateError as any).source)})`;
+        }
+        setError(`Falha ao atualizar a senha: ${detailedUpdateErrorMessage}`);
+        setLoading(false); // Mantém o loading false aqui, pois o catch geral também o fará.
+        return; // Retorna para evitar o bloco de sucesso.
       }
 
       setSuccess('Senha definida com sucesso! Você será redirecionado para a página de login.');

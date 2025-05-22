@@ -142,136 +142,84 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Hotmart Webhook] Processando evento '${eventoPrincipal}' para ${emailComprador}.`);
 
-    // 4. Verificar se o usuário já existe
-    let usuarioExistente = null;
-    try {
-      // A documentação mais recente sugere que filtros como `email` não são diretamente suportados em `listUsers`.
-      // A melhor abordagem seria criar um usuário e lidar com o conflito, ou iterar sobre os usuários.
-      // No entanto, para verificar a existência antes de criar e para o seu fluxo:
-      // Vamos prosseguir com a criação e Supabase lidará com o erro se o email já existir (se houver constraint unique).
-      // Mas, para o log e para obter o userId se já existir, precisamos de uma busca.
-      // A createUser irá falhar se o email já existir e for confirmado.
-
-      // Simplificando a lógica de verificação de usuário existente para este contexto:
-      // Tentaremos criar o usuário. Se ele já existir, o createUser pode falhar ou retornar o usuário existente
-      // dependendo da configuração e se o email está confirmado. 
-      // Vamos remover a busca explícita por enquanto e confiar no comportamento do createUser e generateLink.
-      // A lógica de `userId = usuarioExistente?.id;` será ajustada após a tentativa de criação.
-      // Esta parte precisa ser refinada para um tratamento robusto de usuário existente.
-      // Por ora, focaremos em corrigir a query direta a `public.users`.
-      // A busca por `from('users')` estava definitivamente errada.
-      // Para o fluxo de "criar ou obter link para usuário existente", a lógica abaixo (criar, depois gerar link) é mais direta.
-
-    } catch (e) {
-      console.warn('[Hotmart Webhook] Aviso ao tentar listar/verificar usuário (pode ser ignorado se a criação tratar conflitos):', e);
-    }
-
-    // 5. Criar novo usuário no Supabase Auth ou obter dados se já existir
+    // 4. Convidar usuário via Supabase Auth e registrar/atualizar metadados
     let userId: string | undefined;
-
-    const { data: novoUsuarioData, error: erroNovoUsuario } = await supabaseAdmin.auth.admin.createUser({
-      email: emailComprador,
-      email_confirm: true, 
-      user_metadata: { nome_completo: nomeComprador },
-    });
-
-    if (erroNovoUsuario) {
-      // Verifica mensagens comuns de erro do Supabase para "usuário já existe"
-      if (erroNovoUsuario.message.toLowerCase().includes('user already exists') || 
-          erroNovoUsuario.message.toLowerCase().includes('duplicate key value violates unique constraint')) {
-        
-        console.log(`[Hotmart Webhook] Tentativa de criar usuário ${emailComprador} falhou pois ele já existe. Buscando ID do usuário existente.`);
-        
-        // IMPORTANTE: listUsers() sem filtros busca TODOS os usuários.
-        // Para um grande número de usuários, implemente paginação ou uma função SQL (RPC) otimizada.
-        const { data: { users: listaDeUsuarios }, error: erroListagem } = await supabaseAdmin.auth.admin.listUsers({ perPage: 10000 }); 
-
-        if (erroListagem) {
-          console.error('[Hotmart Webhook] Erro ao listar usuários para encontrar o ID do existente:', erroListagem);
-          return NextResponse.json({ error: `Falha ao buscar usuário existente: ${erroListagem.message}` }, { status: 500 });
-        }
-        
-        const usuarioEncontrado = listaDeUsuarios.find(u => u.email === emailComprador);
-        
-        if (usuarioEncontrado) {
-          userId = usuarioEncontrado.id;
-          console.log(`[Hotmart Webhook] Usuário existente ${emailComprador} encontrado com ID: ${userId}.`);
-        } else {
-          console.error(`[Hotmart Webhook] Erro CRÍTICO: Usuário ${emailComprador} supostamente já existe (createUser falhou), mas não foi encontrado na lista de usuários.`);
-          return NextResponse.json({ error: 'Inconsistência ao processar usuário existente.' }, { status: 500 });
-        }
-      } else {
-        // Outro erro durante a criação do usuário, não relacionado a "já existe"
-        console.error('[Hotmart Webhook] Erro ao criar usuário no Supabase Auth:', erroNovoUsuario);
-        return NextResponse.json({ error: `Falha ao criar usuário: ${erroNovoUsuario.message}` }, { status: 500 });
-      }
-    } else {
-      // Usuário criado com sucesso pela primeira vez
-      userId = novoUsuarioData.user?.id;
-      console.log(`[Hotmart Webhook] Novo usuário ${emailComprador} criado com sucesso. ID: ${userId}`);
-    }
-    
-    if (!userId) {
-      console.error('[Hotmart Webhook] ID do usuário não pôde ser determinado.');
-      return NextResponse.json({ error: 'Falha crítica ao obter ID do usuário.' }, { status: 500 });
-    }
-
-    // 6. Gerar o link para definir a senha
-    // Este link é para o primeiro acesso, mas pode ser usado para reset se o usuário já existir e não tiver senha.
-    // A URL de redirecionamento deve ser a sua página /definir-senha no frontend.
     const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/definir-senha`;
 
-    console.log('[Hotmart Webhook] Detalhes da Geração do Link:', {
-      email: emailComprador,
-      redirectToUsado: redirectUrl, 
-      NEXT_PUBLIC_APP_URL_Valor: process.env.NEXT_PUBLIC_APP_URL
-    });
+    console.log(`[Hotmart Webhook] Tentando convidar usuário: ${emailComprador} com nome: ${nomeComprador}. Redirecionamento para ${redirectUrl}`);
 
-    const { data: linkData, error: erroLink } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'recovery', // Alterado para 'recovery'
-      email: emailComprador,
-      options: {
-        redirectTo: redirectUrl, 
+    const { data: inviteUserData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+      emailComprador,
+      {
+        redirectTo: redirectUrl,
+        data: { nome_completo: nomeComprador } // Passa nome_completo para user_metadata
       }
-    });
+    );
 
-    if (erroLink) {
-      console.error('[Hotmart Webhook] Erro ao gerar link de definição de senha:', erroLink);
-      return NextResponse.json({ error: `Falha ao gerar link: ${erroLink.message}` }, { status: 500 });
-    }
-    // Acessar diretamente o action_link da primeira tentativa.
-    // O nome da propriedade é 'action_link' para 'recovery' e 'magiclink' quando gerados via admin.generateLink
-    // e 'confirmation_url' para 'signup' quando se espera que o Supabase envie o email.
-    // Para type: 'recovery', esperamos 'action_link'.
-    const linkDefinicaoSenha = linkData.properties?.action_link;
+    if (inviteError) {
+      // Verifica se o erro é "User already registered" ou similar.
+      // A mensagem exata pode variar; verificar logs do Supabase ou documentação.
+      // Exemplos: "User already registered", "A user with this email address has already been registered"
+      if (inviteError.message.toLowerCase().includes('user already registered') ||
+          inviteError.message.toLowerCase().includes('already been registered') ||
+          (inviteError.message.toLowerCase().includes('conflict') && inviteError.message.toLowerCase().includes('email'))) {
+        
+        console.log(`[Hotmart Webhook] Usuário ${emailComprador} já está registrado. Tentando buscar ID para atualizar assinatura.`);
+        
+        // Como inviteUserByEmail falhou porque o usuário já existe, precisamos obter o ID do usuário existente.
+        // IMPORTANTE: listUsers() sem filtros busca TODOS os usuários. Para produção com muitos usuários, considere otimizações (ex: RPC).
+        const { data: { users: listaDeUsuarios }, error: erroListagem } = await supabaseAdmin.auth.admin.listUsers({ perPage: 10000 }); // Ajuste perPage conforme necessário
 
-    if (!linkDefinicaoSenha) {
-      console.error('[Hotmart Webhook] Não foi possível obter o action_link para definição de senha a partir do linkData:', linkData);
-      // Logar o objeto linkData inteiro pode ajudar a entender o que está sendo retornado se action_link estiver ausente.
-      return NextResponse.json({ error: 'Falha ao obter link de definição de senha do objeto retornado.' }, { status: 500 });
-    }
-    console.log(`[Hotmart Webhook] Link de definição de senha gerado: ${linkDefinicaoSenha}`);
-
-
-    // 7. Invocar a Edge Function 'enviar-email-boas-vindas'
-    const { error: erroEnvioEmail } = await supabaseAdmin.functions.invoke('enviar-email-boas-vindas', {
-      body: {
-        emailDestinatario: emailComprador,
-        nomeDestinatario: nomeComprador,
-        linkDefinicaoSenha: linkDefinicaoSenha,
-      },
-    });
-
-    if (erroEnvioEmail) {
-      console.error('[Hotmart Webhook] Erro ao invocar a função de enviar email:', erroEnvioEmail);
-      // Não necessariamente um erro fatal para o webhook do Hotmart, mas precisa ser investigado.
-      // O usuário foi criado, mas o email pode não ter sido enviado.
-      // Retornar sucesso para Hotmart, mas logar o erro.
+        if (erroListagem) {
+          console.error('[Hotmart Webhook] Erro ao listar usuários para encontrar o ID do existente (após falha no convite):', erroListagem);
+          // Não retornamos erro fatal aqui, pois a assinatura ainda pode ser o mais importante.
+        } else {
+          const usuarioEncontrado = listaDeUsuarios.find(u => u.email === emailComprador);
+          if (usuarioEncontrado) {
+            userId = usuarioEncontrado.id;
+            console.log(`[Hotmart Webhook] Usuário existente ${emailComprador} encontrado com ID: ${userId}. Nenhum novo email de convite foi enviado pois o usuário já está registrado.`);
+            
+            // Opcional: Atualizar metadados se necessário, já que o convite não os aplicará a um usuário existente.
+            if (nomeComprador && usuarioEncontrado.user_metadata?.nome_completo !== nomeComprador) {
+              const { error: updateMetaError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+                user_metadata: { ...usuarioEncontrado.user_metadata, nome_completo: nomeComprador }
+              });
+              if (updateMetaError) {
+                console.warn(`[Hotmart Webhook] Falha ao tentar atualizar nome_completo para usuário existente ${userId}:`, updateMetaError.message);
+              } else {
+                console.log(`[Hotmart Webhook] Metadados (nome_completo) atualizados para usuário existente ${userId}.`);
+              }
+            }
+          } else {
+            console.warn(`[Hotmart Webhook] Usuário ${emailComprador} supostamente já registrado (convite falhou), mas não foi encontrado na lista. Assinatura pode não ser vinculada.`);
+          }
+        }
+      } else {
+        // Outro erro durante o convite, não relacionado a "usuário já existe"
+        console.error('[Hotmart Webhook] Erro ao convidar usuário no Supabase Auth:', inviteError.message, inviteError);
+        return NextResponse.json({ error: `Falha ao convidar usuário: ${inviteError.message}` }, { status: 500 });
+      }
+    } else if (inviteUserData && inviteUserData.user) {
+      // Usuário convidado com sucesso (novo ou re-convite se aplicável e permitido pelo Supabase)
+      userId = inviteUserData.user.id;
+      console.log(`[Hotmart Webhook] Convite enviado com sucesso para ${emailComprador}. ID do usuário: ${userId}. O Supabase cuidará do envio do e-mail.`);
     } else {
-      console.log(`[Hotmart Webhook] Função 'enviar-email-boas-vindas' invocada com sucesso para ${emailComprador}.`);
+      // Caso inesperado: sem erro, mas sem dados do usuário.
+      console.error('[Hotmart Webhook] Resposta do convite não continha dados do usuário e nenhum erro foi lançado.');
+      return NextResponse.json({ error: 'Resposta inesperada do Supabase ao tentar convidar usuário.' }, { status: 500 });
+    }
+    
+    if (!userId && (eventoPrincipal?.toUpperCase() === 'PURCHASE_APPROVED' || eventoPrincipal?.toUpperCase() === 'SUBSCRIPTION_ACTIVATED')) {
+      // Se o userId não pôde ser determinado para um evento de compra/ativação, isso é um problema sério para vincular a assinatura.
+      console.error(`[Hotmart Webhook] CRÍTICO: ID do usuário não pôde ser determinado para ${emailComprador} em um evento de compra/ativação. A assinatura não será vinculada corretamente.`);
+      // Você pode querer retornar um erro aqui para sinalizar que a transação do webhook não pôde ser completada.
+      // return NextResponse.json({ error: 'ID do usuário não pôde ser determinado, impossível processar a assinatura.' }, { status: 500 });
+      // Por enquanto, apenas logamos de forma crítica e deixamos a lógica de salvarOuAtualizarAssinatura tentar lidar com userId undefined, se aplicável.
+    } else if (!userId) {
+      console.warn(`[Hotmart Webhook] ID do usuário não pôde ser determinado para ${emailComprador}.`);
     }
 
-    // 8. Criar/atualizar perfil na tabela 'perfis_profissionais'
+    // 6. Criar/atualizar perfil na tabela 'perfis_profissionais'
     if (userId) {
       const tipoPlanoCalculado = mapearPlanoHotmart(payload.data?.subscription?.plan?.name || payload.data?.product?.name);
       
