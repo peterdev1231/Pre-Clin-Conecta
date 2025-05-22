@@ -173,11 +173,8 @@ export default function FirstAccessPasswordForm() {
         return;
       }
       
-      // Construir otpParams dinamicamente
-      let otpParams: { token: string; type: 'recovery' | 'invite'; email?: string } = {
-        token: accessToken!, 
-        type: tokenType as 'recovery' | 'invite',
-      };
+      // Construir otpParams explicitamente para garantir a estrutura
+      let otpParams: { token: string; type: 'recovery' | 'invite'; email?: string };
 
       if (tokenType === 'invite') {
         if (!emailFromQuery) {
@@ -186,7 +183,16 @@ export default function FirstAccessPasswordForm() {
           setLoading(false);
           return;
         }
-        otpParams.email = emailFromQuery;
+        otpParams = {
+          token: accessToken!,
+          type: 'invite',
+          email: emailFromQuery
+        };
+      } else { // Assume 'recovery' ou outros tipos suportados pelo verifyOtp que não precisam de email
+         otpParams = {
+          token: accessToken!,
+          type: tokenType as 'recovery' | 'invite', // Usar o tokenType original
+        };
       }
       
       console.log(`[DebugForm] Attempting to verify OTP with params:`, otpParams);
