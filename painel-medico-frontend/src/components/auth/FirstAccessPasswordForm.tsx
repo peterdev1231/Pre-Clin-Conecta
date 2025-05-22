@@ -60,6 +60,8 @@ export default function FirstAccessPasswordForm() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [tokenType, setTokenType] = useState<string | null>(null);
   const [emailFromQuery, setEmailFromQuery] = useState<string | null>(null); // Novo estado para o email
+  // Estado para controlar se a verificação OTP está em andamento
+  const [isVerifying, setIsVerifying] = useState(false);
   // refreshToken e expiresIn podem ser úteis para debug ou contextos futuros, mas não são usados diretamente em verifyOtp.
   // const [refreshToken, setRefreshToken] = useState<string | null>(null); 
   // const [expiresIn, setExpiresIn] = useState<string | null>(null);
@@ -157,10 +159,14 @@ export default function FirstAccessPasswordForm() {
     }
 
     try {
-      // Verificar se temos o token de acesso
-      if (!accessToken) {
-        // Esta verificação agora deve ser mais robusta devido ao useEffect acima
-        setError('Token de acesso não está disponível. O link pode ser inválido ou ter expirado.');
+      // Verificar se temos o token de acesso e se a verificação já não está em andamento
+      if (!accessToken || isVerifying) {
+        if (!accessToken) {
+           setError('Token de acesso não está disponível. O link pode ser inválido ou ter expirado.');
+        } else if (isVerifying) {
+           console.log('[DebugForm] verifyOtp já em andamento, ignorando nova chamada.');
+           // Não defina erro aqui, apenas ignore.
+        }
         setLoading(false);
         return;
       }
@@ -199,6 +205,9 @@ export default function FirstAccessPasswordForm() {
       
       // Adicionando log para inspecionar otpParams antes da chamada
       console.log('[DebugForm] otpParams before verifyOtp:', otpParams);
+      
+      // Definir flag de verificação antes de chamar a API
+      setIsVerifying(true);
 
       // Usar verifyOtp para consumir o token e estabelecer a sessão
       // @ts-ignore -- Mantendo temporariamente SE o usuário confirmar que o erro de tipo persiste após limpeza
@@ -266,6 +275,8 @@ export default function FirstAccessPasswordForm() {
     } finally {
       console.log('[DebugForm] handleSetPassword finally block. Loading set to false.');
       setLoading(false);
+      // Resetar flag de verificação no finally
+      setIsVerifying(false);
     }
   };
 
@@ -339,7 +350,7 @@ export default function FirstAccessPasswordForm() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || isVerifying}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-70 disabled:cursor-not-allowed transition duration-150 ease-in-out"
             >
               {loading ? (
