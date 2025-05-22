@@ -34,6 +34,8 @@ serve(async (req: Request) => {
     const payload: WelcomeEmailPayload = await req.json();
     const { emailDestinatario, nomeDestinatario, linkDefinicaoSenha, senhaGerada } = payload;
 
+    console.log('[enviar-email-boas-vindas] Payload recebido. Senha gerada:', senhaGerada);
+
     if (!emailDestinatario) {
       return new Response(JSON.stringify({ error: 'emailDestinatario é obrigatório.' }), {
         status: 400,
