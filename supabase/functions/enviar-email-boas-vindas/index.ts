@@ -45,41 +45,97 @@ serve(async (req: Request) => {
 
     const nomeFormatado = nomeDestinatario || emailDestinatario.split('@')[0] || 'Usuário';
     
-    const emailSubject = 'Bem-vindo(a) ao PréClin Conecta!';
     let emailHtmlBody = `
-      <p>Olá ${nomeFormatado},</p>
-      <p>Seja muito bem-vindo(a) ao PréClin Conecta! Estamos muito felizes em ter você conosco.</p>
-      <p>Seu acesso à plataforma foi criado com sucesso.</p>
-      <p><strong>Seu email para login é:</strong> ${emailDestinatario}</p>
+      <div style="max-width:600px;margin:0 auto;padding:20px;font-family:Arial, sans-serif;background-color:#ffffff;color:#333333;">
+        <p style="font-size:16px;line-height:1.5;color:#064E3B;">
+          Olá <strong>${nomeFormatado}</strong>,
+        </p>
+
+        <p style="font-size:14px;line-height:1.6;">
+          Seja muito bem-vindo(a) ao <strong style="color:#00B35A;">PréClin Conecta</strong>! Estamos muito felizes em ter você conosco.
+        </p>
+
+        <p style="font-size:14px;line-height:1.6;">
+          Seu acesso à plataforma foi criado com sucesso.
+        </p>
+
+        <p style="font-size:14px;line-height:1.6;">
+          <strong style="color:#064E3B;">Seu email para login é:</strong> ${emailDestinatario}
+        </p>
     `;
 
     if (senhaGerada) {
         emailHtmlBody += `
-            <p><strong>Sua senha temporária para o primeiro acesso é:</strong> <code>${senhaGerada}</code></p>
-            <p>Recomendamos que você altere esta senha após o primeiro login por segurança.</p>
-            <p>Você pode fazer login agora clicando aqui: <a href="${APP_LOGIN_URL}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Ir para a Página de Login</a></p>
-             <p style="font-size: 0.9em; color: #666;">Se o botão acima não funcionar, copie e cole o seguinte endereço no seu navegador:<br>${APP_LOGIN_URL}</p>
-        `;
+        <p style="font-size:14px;line-height:1.6;">
+          <strong style="color:#064E3B;">Sua senha temporária para o primeiro acesso é:</strong>
+          <code style="display:inline-block;background-color:#F2F2F2;padding:4px 8px;border-radius:4px;color:#333333;">${senhaGerada}</code>
+        </p>
+        <p style="font-size:14px;line-height:1.6;">
+          Recomendamos que você altere esta senha após o primeiro login por segurança.
+        </p>
+        <p style="text-align:center;margin:30px 0;">
+          <a
+            href="${APP_LOGIN_URL}"
+            style="
+              background-color:#00B35A;
+              color:#ffffff;
+              text-decoration:none;
+              font-size:16px;
+              font-weight:bold;
+              padding:12px 24px;
+              border-radius:8px;
+              display:inline-block;
+            "
+          >
+            Ir para a Página de Login
+          </a>
+        </p>
+        <p style="font-size:12px;line-height:1.4;color:#777777;">
+          Se o botão acima não funcionar, copie e cole o seguinte endereço no seu navegador:<br>
+          ${APP_LOGIN_URL}
+        </p>
+    `;
     } else {
-        // Fallback caso a senha gerada não seja fornecida (não deveria acontecer neste fluxo)
-         emailHtmlBody += `
-            <p>Para acessar sua conta, por favor, visite a página de login: <a href="${APP_LOGIN_URL}">${APP_LOGIN_URL}</a></p>
-            <p>Se você não souber sua senha, utilize a opção "Esqueci minha senha" na página de login.</p>
-         `;
-         console.warn('[enviar-email-boas-vindas] senhaGerada não fornecida no payload para email de boas-vindas.');
+        emailHtmlBody += `
+        <p style="font-size:14px;line-height:1.6;">
+          Para acessar sua conta, por favor, visite a página de login:
+          <a href="${APP_LOGIN_URL}" style="color:#00B35A;text-decoration:none;">${APP_LOGIN_URL}</a>
+        </p>
+        <p style="font-size:14px;line-height:1.6;">
+          Se você não souber sua senha, utilize a opção "Esqueci minha senha" na página de login.
+        </p>
+        <p style="font-size:12px;color:#FF6B6B;">
+          <!-- log de advertência caso queira -->
+          ⚠️ [enviar-email-boas-vindas] senhaGerada não fornecida no payload.
+        </p>
+    `;
     }
 
     emailHtmlBody += `
-      <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-      <p>Se tiver qualquer dúvida, nossa equipe de suporte está à disposição através do email <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>
-      <p style="font-size: 0.9em; color: #666;">Lembre-se: este é um email automático, por favor, não responda diretamente a esta mensagem.</p>
-      <p>Atenciosamente,<br>Equipe PréClin Conecta</p>
+        <hr style="border:none;border-top:1px solid #EEEEEE;margin:30px 0;">
+
+        <p style="font-size:14px;line-height:1.6;">
+          Se tiver qualquer dúvida, nossa equipe de suporte está à disposição através do email
+          <a href="mailto:${SUPPORT_EMAIL}" style="color:#00B35A;text-decoration:none;">
+            ${SUPPORT_EMAIL}
+          </a>.
+        </p>
+
+        <p style="font-size:12px;line-height:1.4;color:#777777;">
+          Lembre-se: este é um email automático, por favor, não responda diretamente a esta mensagem.
+        </p>
+
+        <p style="font-size:14px;line-height:1.6;color:#064E3B;">
+          Atenciosamente,<br>
+          <strong>Equipe PréClin Conecta</strong>
+        </p>
+      </div>
     `;
 
     const resendPayload = {
       from: `${EMAIL_FROM_NAME} <${EMAIL_FROM_ADDRESS}>`,
       to: [emailDestinatario],
-      subject: emailSubject,
+      subject: 'Bem-vindo(a) ao PréClin Conecta!',
       html: emailHtmlBody,
     };
 
