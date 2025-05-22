@@ -56,15 +56,8 @@ export default function FirstAccessPasswordForm() {
   const [isFormActive, setIsFormActive] = useState(true); 
   const [isOnCorrectPath, setIsOnCorrectPath] = useState(() => isCorrectPathForPasswordForm());
   
-  // Estados para accessToken e tokenType (REINTRODUZIDOS)
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [tokenType, setTokenType] = useState<string | null>(null);
-  const [emailFromQuery, setEmailFromQuery] = useState<string | null>(null); // Novo estado para o email
-  // Estado para controlar se a verificação OTP está em andamento
-  const [isVerifying, setIsVerifying] = useState(false);
-  // refreshToken e expiresIn podem ser úteis para debug ou contextos futuros, mas não são usados diretamente em verifyOtp.
-  // const [refreshToken, setRefreshToken] = useState<string | null>(null); 
-  // const [expiresIn, setExpiresIn] = useState<string | null>(null);
+  // Estados para o formulário de senha
+  const [isSubmitting, setIsSubmitting] = useState(false); // Estado para controlar o loading do botão
 
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -98,185 +91,67 @@ export default function FirstAccessPasswordForm() {
     }
   }, [isOnCorrectPath]);
 
-  // Extrair o token e o email ao montar o componente
+  // Extrair o email da query string ao montar o componente (ainda pode ser útil para debug ou contexto)
   useEffect(() => {
-    const { accessToken: token, tokenType: type, refreshToken: rToken, expiresIn: expIn } = getTokenInfoFromUrl();
     const email = getQueryParam('email'); // Extrair email da query string
     
-    console.log('[DebugForm] Token info extracted:', { 
-      hasToken: !!token, 
-      tokenType: type,
-      hasRefreshToken: !!rToken,
-      expiresIn: expIn,
+    console.log('[DebugForm] Email extracted:', { 
       emailFromQuery: email // Logar email extraído
     });
     
-    setAccessToken(token);
-    setTokenType(type);
-    setEmailFromQuery(email); // Armazenar email no estado
-    
-    if (!token && isOnCorrectPath) { 
-      setError('Token de acesso não encontrado na URL. Por favor, use o link completo enviado para o seu email.');
-      setIsFormActive(false); // Desativa o formulário
-      // Limpar hash para não confundir o usuário ou expor token inválido/ausente
-      if (typeof window !== 'undefined') {
-        history.replaceState(null, '', window.location.pathname);
-      }
-    } else if (token && type !== 'recovery' && isOnCorrectPath) {
-      // Se temos um token, mas não é do tipo 'recovery', isso pode ser um problema.
-      // Para o fluxo de definir-senha, esperamos 'recovery'.
-      console.warn('[DebugForm] Token encontrado, mas não é do tipo "recovery". Tipo recebido:', type);
-      // Poderia-se adicionar um setError aqui se outros tipos não são esperados/tratados.
-      // setError('O link utilizado não é válido para recuperação de senha. Verifique o link ou contate o suporte.');
-      // setIsFormActive(false);
-    }
-
-    // Para o fluxo de definir-senha, esperamos 'recovery' ou 'invite'.
-    // No caso de 'invite', também precisamos do email.
-    if (type === 'invite' && !email) {
-      console.warn('[DebugForm] Token do tipo "invite" mas email não encontrado na query string.');
+    if (!email && isOnCorrectPath) { 
       setError('Informações incompletas no link. O e-mail é necessário para convites. Por favor, use o link original.');
       setIsFormActive(false);
     }
   }, [isOnCorrectPath]); // Dependência apenas em isOnCorrectPath para rodar na montagem e se o path mudar
 
-  const handleSetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
 
+    // Validar se as senhas coincidem e atendem ao comprimento mínimo
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
     if (password !== confirmPassword) {
       setError('As senhas não coincidem.');
-      setLoading(false);
       return;
     }
 
-    if (password.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres.');
-      setLoading(false);
-      return;
-    }
+    setIsSubmitting(true); // Inicia o estado de submissão
+    setError(null); // Limpa erros anteriores
+    setSuccess(null); // Limpa sucesso anterior
 
     try {
-      // Verificar se temos o token de acesso e se a verificação já não está em andamento
-      if (!accessToken || isVerifying) {
-        if (!accessToken) {
-           setError('Token de acesso não está disponível. O link pode ser inválido ou ter expirado.');
-        } else if (isVerifying) {
-           console.log('[DebugForm] verifyOtp já em andamento, ignorando nova chamada.');
-           // Não defina erro aqui, apenas ignore.
-        }
-        setLoading(false);
-        return;
-      }
-
-      // Este formulário é para 'recovery' ou 'invite' type tokens.
-      if (tokenType !== 'recovery' && tokenType !== 'invite') {
-        console.error(`[DebugForm] Tipo de token inválido para esta página: '${tokenType}'. Esperado 'recovery' ou 'invite'.`);
-        setError('Link inválido ou tipo de token não suportado para esta operação. Por favor, use o link correto.');
-        setLoading(false);
-        return;
-      }
-      
-      // Construir otpParams explicitamente para garantir a estrutura
-      let otpParams: { token: string; type: 'recovery' | 'invite'; email?: string };
-
-      if (tokenType === 'invite') {
-        if (!emailFromQuery) {
-          console.error('[DebugForm] Tentando verificar OTP do tipo "invite" sem e-mail.');
-          setError('E-mail não encontrado para verificação do convite. O link pode estar incompleto.');
-          setLoading(false);
-          return;
-        }
-        otpParams = {
-          token: accessToken!,
-          type: 'invite',
-          email: emailFromQuery
-        };
-      } else { // Assume 'recovery' ou outros tipos suportados pelo verifyOtp que não precisam de email
-         otpParams = {
-          token: accessToken!,
-          type: tokenType as 'recovery' | 'invite', // Usar o tokenType original
-        };
-      }
-      
-      console.log(`[DebugForm] Attempting to verify OTP with params:`, otpParams);
-      
-      // Adicionando log para inspecionar otpParams antes da chamada
-      console.log('[DebugForm] otpParams before verifyOtp:', otpParams);
-      
-      // Definir flag de verificação antes de chamar a API
-      setIsVerifying(true);
-
-      // Usar verifyOtp para consumir o token e estabelecer a sessão
-      // @ts-ignore -- Mantendo temporariamente SE o usuário confirmar que o erro de tipo persiste após limpeza
-      const { data, error: otpError } = await supabase.auth.verifyOtp(otpParams);
-
-      // A resposta (data) deve ser do tipo AuthOtpResponse
-      // O tipo de 'data' retornado por verifyOtp já é AuthOtpResponse['data'] | null
-      // então um cast direto para AuthOtpResponse['data'] pode não ser ideal se for null.
-      // Vamos verificar data antes de acessar suas propriedades.
-
-      if (otpError) {
-        console.error('[DebugForm] Error verifying OTP:', otpError);
-        let detailedErrorMessage = otpError.message;
-        if ((otpError as any).source) { 
-            detailedErrorMessage += ` (Source: ${JSON.stringify((otpError as any).source)})`;
-        }
-        setError(`Falha ao verificar o token: ${detailedErrorMessage}`);
-        setLoading(false);
-        return; 
-      }
-
-      // Verificar se data e data.session existem
-      if (!data || !data.session) {
-        console.error('[DebugForm] OTP verified but no session returned in data:', data);
-        setError('Não foi possível estabelecer uma sessão após verificar o token. Verifique o console para detalhes.');
-        setLoading(false);
-        return;
-      }
-      
-      // Agora data e data.session são conhecidos por existirem
-      console.log('[DebugForm] OTP verified, session established. User:', data.user);
-      console.log('[DebugForm] Session details:', data.session);
-      console.log('[DebugForm] Now attempting to update password');
-
-      // Agora, com a sessão estabelecida por verifyOtp, updateUser deve funcionar
-      const { error: updateError } = await supabase.auth.updateUser({ 
-        password
-      });
+      // Supabase Client SDK já deve ter processado o token da URL e estabelecido a sessão.
+      // Agora, simplesmente atualizamos a senha do usuário logado temporariamente.
+      console.log('[DebugForm] Attempting to update user password.');
+      const { error: updateError } = await supabase.auth.updateUser({ password: password });
 
       if (updateError) {
-        console.error('[DebugForm] Error updating password after OTP verification:', updateError);
-        // Adicionar mais detalhes do erro se disponíveis:
+        console.error('[DebugForm] Error updating password:', updateError);
         let detailedUpdateErrorMessage = updateError.message;
-        if ((updateError as any).source) { 
-            detailedUpdateErrorMessage += ` (Source: ${JSON.stringify((updateError as any).source)})`;
-        }
-        setError(`Falha ao atualizar a senha: ${detailedUpdateErrorMessage}`);
-        setLoading(false); // Mantém o loading false aqui, pois o catch geral também o fará.
-        return; // Retorna para evitar o bloco de sucesso.
+        // Adicionar mais detalhes do erro se disponíveis (pode variar dependendo do erro exato)
+        // if ((updateError as any).source) { 
+        //     detailedUpdateErrorMessage += ` (Source: ${JSON.stringify((updateError as any).source)})`;
+        // }
+        setError(`Falha ao definir a senha: ${detailedUpdateErrorMessage}`);
+      } else {
+        console.log('[DebugForm] Password set successfully.');
+        setSuccess('Senha definida com sucesso!');
+        setPassword('');
+        setConfirmPassword('');
+        setIsFormActive(false); // Desativa o formulário em caso de sucesso
+        
+        // O AuthContext deve lidar com a navegação automática após a atualização bem-sucedida do usuário.
+        // Não precisamos chamar router.push() aqui manualmente, a menos que queiramos forçar um redirecionamento específico.
+        // Exemplo (se AuthContext não redirecionar automaticamente): setTimeout(() => router.push('/dashboard'), 2000);
       }
-
-      setSuccess('Senha definida com sucesso! Você será redirecionado para a página de login.');
-      setIsFormActive(false); // Desativa o formulário após sucesso
-      setTimeout(() => {
-        router.push('/login'); // Alterado para redirecionar para /login
-      }, 3000);
-
-    } catch (err: unknown) {
-      console.error('Set password error:', err);
-      const message = err instanceof Error ? err.message : 'Ocorreu um erro ao tentar definir sua senha.';
-      console.error('[DebugForm] Error in handleSetPassword:', message);
-      setError(message);
-      // Não desativar o formulário aqui, para que o usuário possa ver o erro e tentar novamente se for algo transitório
-      // setIsFormActive(false); 
+    } catch (err: any) {
+      console.error('[DebugForm] Unexpected error during password update:', err);
+      setError(`Ocorreu um erro inesperado: ${err.message || String(err)}`);
     } finally {
-      console.log('[DebugForm] handleSetPassword finally block. Loading set to false.');
-      setLoading(false);
-      // Resetar flag de verificação no finally
-      setIsVerifying(false);
+      setIsSubmitting(false); // Finaliza o estado de submissão
     }
   };
 
@@ -350,7 +225,7 @@ export default function FirstAccessPasswordForm() {
           <div>
             <button
               type="submit"
-              disabled={loading || isVerifying}
+              disabled={loading || isSubmitting}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-70 disabled:cursor-not-allowed transition duration-150 ease-in-out"
             >
               {loading ? (
