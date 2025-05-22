@@ -95,9 +95,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     });
 
+    // Adicionar um delay para tentar obter a sessão após o carregamento inicial e processamento do hash
+    // Isso pode ajudar se o processamento inicial do hash for assíncrono e demorar um pouco
+    const initialSessionCheckTimer = setTimeout(async () => {
+        console.log('[AuthContext] Delayed session check triggered.');
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        console.log('[AuthContext] Delayed getSession result:', { currentSession, error });
+        if (error) {
+            console.error('[AuthContext] Error in delayed getSession:', error);
+        }
+        // O listener onAuthStateChange deve capturar a sessão se ela for estabelecida por getSession
+    }, 1500); // Atraso de 1.5 segundos
+
     return () => {
-      console.log('%cAuthContext: useEffect unmounting. Unsubscribing authListener.', 'color: purple;');
+      console.log('%cAuthContext: useEffect unmounting. Unsubscribing authListener and clearing timer.', 'color: purple;');
       authListener.subscription.unsubscribe();
+      clearTimeout(initialSessionCheckTimer);
     };
   }, [supabase]); // A dependência é apenas o cliente supabase
 
