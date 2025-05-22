@@ -13,7 +13,8 @@ const SUPPORT_EMAIL = 'suporte@preclinconecta.com';
 interface WelcomeEmailPayload {
   emailDestinatario: string;
   nomeDestinatario?: string;
-  linkDefinicaoSenha?: string; // Novo campo!
+  linkDefinicaoSenha?: string; // Campo antigo, será descontinuado para este fluxo
+  senhaGerada?: string; // NOVO CAMPO: para receber a senha gerada
 }
 
 serve(async (req: Request) => {
@@ -31,7 +32,7 @@ serve(async (req: Request) => {
 
   try {
     const payload: WelcomeEmailPayload = await req.json();
-    const { emailDestinatario, nomeDestinatario, linkDefinicaoSenha } = payload;
+    const { emailDestinatario, nomeDestinatario, linkDefinicaoSenha, senhaGerada } = payload;
 
     if (!emailDestinatario) {
       return new Response(JSON.stringify({ error: 'emailDestinatario é obrigatório.' }), {
@@ -50,29 +51,20 @@ serve(async (req: Request) => {
       <p><strong>Seu email para login é:</strong> ${emailDestinatario}</p>
     `;
 
-    if (linkDefinicaoSenha) {
-      // CORREÇÃO: Substituir '/atualizar-senha' por '/definir-senha' no link, se necessário
-      let linkModificado = linkDefinicaoSenha;
-      if (linkDefinicaoSenha.includes('/atualizar-senha')) {
-        console.log('[enviar-email-boas-vindas] Substituindo URL de atualizar-senha para definir-senha');
-        linkModificado = linkDefinicaoSenha.replace('/atualizar-senha', '/definir-senha');
-      }
-
-      emailHtmlBody += `
-        <p><strong>Para seu primeiro acesso, por favor, defina sua senha clicando no link abaixo:</strong></p>
-        <p><a href="${linkModificado}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Definir Minha Senha</a></p>
-        <p style="font-size: 0.9em; color: #666;">Se o botão acima não funcionar, copie e cole o seguinte endereço no seu navegador:<br>${linkModificado}</p>
-        <p>Após definir sua senha, você poderá acessar o painel em: <a href="${APP_LOGIN_URL}">${APP_LOGIN_URL}</a></p>
-      `;
-
-      // Registrar nos logs as URLs para diagnóstico
-      console.log('[enviar-email-boas-vindas] URL original:', linkDefinicaoSenha);
-      console.log('[enviar-email-boas-vindas] URL modificada:', linkModificado);
+    if (senhaGerada) {
+        emailHtmlBody += `
+            <p><strong>Sua senha temporária para o primeiro acesso é:</strong> <code>${senhaGerada}</code></p>
+            <p>Recomendamos que você altere esta senha após o primeiro login por segurança.</p>
+            <p>Você pode fazer login agora clicando aqui: <a href="${APP_LOGIN_URL}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Ir para a Página de Login</a></p>
+             <p style="font-size: 0.9em; color: #666;">Se o botão acima não funcionar, copie e cole o seguinte endereço no seu navegador:<br>${APP_LOGIN_URL}</p>
+        `;
     } else {
-      emailHtmlBody += `
-        <p>Para definir sua senha e acessar sua conta, por favor, utilize a opção "Esqueci minha senha" na página de login, usando o email ${emailDestinatario}.</p>
-        <p>Acesse o painel em: <a href="${APP_LOGIN_URL}">${APP_LOGIN_URL}</a></p>
-      `;
+        // Fallback caso a senha gerada não seja fornecida (não deveria acontecer neste fluxo)
+         emailHtmlBody += `
+            <p>Para acessar sua conta, por favor, visite a página de login: <a href="${APP_LOGIN_URL}">${APP_LOGIN_URL}</a></p>
+            <p>Se você não souber sua senha, utilize a opção "Esqueci minha senha" na página de login.</p>
+         `;
+         console.warn('[enviar-email-boas-vindas] senhaGerada não fornecida no payload para email de boas-vindas.');
     }
 
     emailHtmlBody += `
