@@ -42,7 +42,7 @@ function getQueryParam(param: string): string | null {
 }
 
 export default function FirstAccessPasswordForm() {
-  const { supabase } = useAuth(); // Removido session e user, pois não dependeremos deles inicialmente
+  const { supabase, session, user } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -58,6 +58,7 @@ export default function FirstAccessPasswordForm() {
   
   // Estados para o formulário de senha
   const [isSubmitting, setIsSubmitting] = useState(false); // Estado para controlar o loading do botão
+  const [isSessionLoaded, setIsSessionLoaded] = useState(false); // Novo estado para rastrear se a sessão foi carregada
 
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
@@ -103,7 +104,21 @@ export default function FirstAccessPasswordForm() {
       setError('Informações incompletas no link. O e-mail é necessário para convites. Por favor, use o link original.');
       setIsFormActive(false);
     }
+    
+    // Marcar a sessão como carregada após a primeira renderização e extração inicial
+    setIsSessionLoaded(true);
+
   }, [isOnCorrectPath]); // Dependência apenas em isOnCorrectPath para rodar na montagem e se o path mudar
+
+  // Adicionar log para verificar o estado da sessão sempre que mudar
+  useEffect(() => {
+      console.log('[DebugForm] Session state changed:', { session, user });
+      // Opcional: Redirecionar automaticamente se uma sessão válida for estabelecida
+      // if (session && isOnCorrectPath) {
+      //     console.log('[DebugForm] Valid session found, redirecting to dashboard.');
+      //     router.push('/dashboard');
+      // }
+  }, [session, user, isOnCorrectPath, router]);
 
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,10 +137,20 @@ export default function FirstAccessPasswordForm() {
     setError(null); // Limpa erros anteriores
     setSuccess(null); // Limpa sucesso anterior
 
+    // VERIFICAR SE A SESSÃO EXISTE ANTES DE TENTAR ATUALIZAR
+    if (!session) {
+        console.error('[DebugForm] handleSetPassword: Auth session is missing before updateUser call.');
+        setError('Sessão de autenticação não encontrada. O link pode ser inválido ou expirado. Tente novamente com um novo link ou contate o suporte.');
+        setIsSubmitting(false);
+        // Opcional: Redirecionar para login após este erro
+        // router.push('/login');
+        return;
+    }
+
     try {
       // Supabase Client SDK já deve ter processado o token da URL e estabelecido a sessão.
       // Agora, simplesmente atualizamos a senha do usuário logado temporariamente.
-      console.log('[DebugForm] Attempting to update user password.');
+      console.log('[DebugForm] Attempting to update user password.', { currentSession: session });
       const { error: updateError } = await supabase.auth.updateUser({ password: password });
 
       if (updateError) {
@@ -172,7 +197,7 @@ export default function FirstAccessPasswordForm() {
         </div>
       )}
 
-      {!success && isFormActive && (
+      {!success && isFormActive && isSessionLoaded && (
         <form onSubmit={handleSetPassword} className="space-y-6">
           <div>
             <label htmlFor="newPassword" className="sr-only">Nova Senha</label>
@@ -225,7 +250,7 @@ export default function FirstAccessPasswordForm() {
           <div>
             <button
               type="submit"
-              disabled={loading || isSubmitting}
+              disabled={isSubmitting || !isSessionLoaded || !session}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-70 disabled:cursor-not-allowed transition duration-150 ease-in-out"
             >
               {loading ? (
@@ -250,17 +275,23 @@ export default function FirstAccessPasswordForm() {
         </p>
       )}
 
-      {!isFormActive && !success && !error && (
+      {!isFormActive && !success && !error && isSessionLoaded && (
          <p className="mt-6 text-center text-sm text-gray-600">
             Não é possível definir a senha no momento. <Link href="/login" className="font-medium text-teal-600 hover:text-teal-500">Voltar para o login</Link>.
         </p>
       )}
 
-      {(!isFormActive || success || error) && !loading && (
+      {(!isFormActive || success || error) && !isSubmitting && isSessionLoaded && (
           <div className="mt-8 text-center">
             <Link href="/login" className="font-medium text-teal-600 hover:text-teal-500 hover:underline">
               Ir para Login
             </Link>
+          </div>
+      )}
+
+      {!isSessionLoaded && (
+          <div className="mt-8 text-center">
+              <p className="text-gray-600">Verificando link de acesso...</p>
           </div>
       )}
     </div>
