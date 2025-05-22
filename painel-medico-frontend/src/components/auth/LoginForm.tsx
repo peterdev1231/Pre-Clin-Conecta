@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'; // Ícones
+import { Mail, Lock, Eye, EyeOff, AlertCircle, FilePlus } from 'lucide-react'; // Ícones
 import Link from 'next/link'; // Importar Link para navegação
 import { useRouter } from 'next/navigation'; // Importar useRouter
-import Image from 'next/image'; // Import next/image
 
 export default function LoginForm() {
   const { supabase } = useAuth();
@@ -54,14 +53,10 @@ export default function LoginForm() {
   return (
     <div className="w-full max-w-md p-8 space-y-6 sm:space-y-8 bg-white dark:bg-slate-800 rounded-xl shadow-2xl">
       <div className="text-center">
-        <div className="mb-6 flex justify-center">
-           <Image
-             src="/Preclin conecta.png"
-             alt="PréClin Conecta Logo"
-             width={88}
-             height={88}
-             className="w-[88px] h-[88px]"
-           />
+        <div className="mb-6 flex flex-col items-center justify-center">
+           <FilePlus className="w-16 h-16 text-[#00A651] mb-2" />
+           <h1 className="text-3xl font-bold text-[#25392C] dark:text-[#C4E8C9]">PréClin</h1>
+           <p className="text-xl font-semibold text-[#25392C] dark:text-[#C4E8C9]">Conecta</p>
         </div>
         <h1 className="text-3xl font-bold text-[#25392C] dark:text-slate-100">Bem-vindo(a) de volta!</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-400">Faça login para acessar seu painel.</p>
