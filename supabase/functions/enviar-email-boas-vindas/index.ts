@@ -34,10 +34,10 @@ serve(async (req: Request) => {
     const payload: WelcomeEmailPayload = await req.json();
     const { emailDestinatario, nomeDestinatario, linkDefinicaoSenha, senhaGerada } = payload;
 
-    console.log('[enviar-email-boas-vindas] Payload recebido. Senha gerada:', senhaGerada);
+    console.log('[enviar-email-boas-vindas] Payload recebido. Email:', emailDestinatario, 'Nome:', nomeDestinatario, 'Senha gerada:', senhaGerada);
 
-    if (!emailDestinatario) {
-      return new Response(JSON.stringify({ error: 'emailDestinatario é obrigatório.' }), {
+    if (!emailDestinatario || !nomeDestinatario) {
+      return new Response(JSON.stringify({ error: 'Os campos emailDestinatario e nomeDestinatario são obrigatórios.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
