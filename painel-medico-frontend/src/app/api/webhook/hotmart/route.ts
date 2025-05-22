@@ -144,14 +144,17 @@ export async function POST(req: NextRequest) {
 
     // 4. Convidar usuário via Supabase Auth e registrar/atualizar metadados
     let userId: string | undefined;
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/definir-senha`;
+    const plainRedirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/definir-senha`;
 
-    console.log(`[Hotmart Webhook] Tentando convidar usuário: ${emailComprador} com nome: ${nomeComprador}. Redirecionamento para ${redirectUrl}`);
+    console.log(`[Hotmart Webhook] Tentando convidar usuário: ${emailComprador} com nome: ${nomeComprador}. URL base de redirecionamento: ${plainRedirectUrl}`);
+
+    // Adicionar o email como query param para ser usado no frontend pelo verifyOtp
+    const redirectUrlWithEmail = `${plainRedirectUrl}?email=${encodeURIComponent(emailComprador)}`;
 
     const { data: inviteUserData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       emailComprador,
       {
-        redirectTo: redirectUrl,
+        redirectTo: redirectUrlWithEmail, // Usar a URL com o email
         data: { nome_completo: nomeComprador } // Passa nome_completo para user_metadata
       }
     );

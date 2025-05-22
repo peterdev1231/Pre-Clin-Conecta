@@ -34,6 +34,13 @@ function getTokenInfoFromUrl() {
   };
 }
 
+// Função para extrair parâmetros da query string
+function getQueryParam(param: string): string | null {
+  if (typeof window === 'undefined') return null;
+  const queryParams = new URLSearchParams(window.location.search);
+  return queryParams.get(param);
+}
+
 export default function FirstAccessPasswordForm() {
   const { supabase } = useAuth(); // Removido session e user, pois não dependeremos deles inicialmente
   const [password, setPassword] = useState('');
@@ -52,6 +59,7 @@ export default function FirstAccessPasswordForm() {
   // Estados para accessToken e tokenType (REINTRODUZIDOS)
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [tokenType, setTokenType] = useState<string | null>(null);
+  const [emailFromQuery, setEmailFromQuery] = useState<string | null>(null); // Novo estado para o email
   // refreshToken e expiresIn podem ser úteis para debug ou contextos futuros, mas não são usados diretamente em verifyOtp.
   // const [refreshToken, setRefreshToken] = useState<string | null>(null); 
   // const [expiresIn, setExpiresIn] = useState<string | null>(null);
@@ -88,22 +96,24 @@ export default function FirstAccessPasswordForm() {
     }
   }, [isOnCorrectPath]);
 
-  // Extrair o token ao montar o componente (REINTRODUZIDO E AJUSTADO)
+  // Extrair o token e o email ao montar o componente
   useEffect(() => {
     const { accessToken: token, tokenType: type, refreshToken: rToken, expiresIn: expIn } = getTokenInfoFromUrl();
+    const email = getQueryParam('email'); // Extrair email da query string
+    
     console.log('[DebugForm] Token info extracted:', { 
-      hasToken: !!token, // Simplificado
+      hasToken: !!token, 
       tokenType: type,
       hasRefreshToken: !!rToken,
-      expiresIn: expIn
+      expiresIn: expIn,
+      emailFromQuery: email // Logar email extraído
     });
     
     setAccessToken(token);
     setTokenType(type);
-    // setRefreshToken(rToken); 
-    // setExpiresIn(expIn);
+    setEmailFromQuery(email); // Armazenar email no estado
     
-    if (!token && isOnCorrectPath) { // Se não temos token e estamos na página correta
+    if (!token && isOnCorrectPath) { 
       setError('Token de acesso não encontrado na URL. Por favor, use o link completo enviado para o seu email.');
       setIsFormActive(false); // Desativa o formulário
       // Limpar hash para não confundir o usuário ou expor token inválido/ausente
@@ -117,6 +127,14 @@ export default function FirstAccessPasswordForm() {
       // Poderia-se adicionar um setError aqui se outros tipos não são esperados/tratados.
       // setError('O link utilizado não é válido para recuperação de senha. Verifique o link ou contate o suporte.');
       // setIsFormActive(false);
+    }
+
+    // Para o fluxo de definir-senha, esperamos 'recovery' ou 'invite'.
+    // No caso de 'invite', também precisamos do email.
+    if (type === 'invite' && !email) {
+      console.warn('[DebugForm] Token do tipo "invite" mas email não encontrado na query string.');
+      setError('Informações incompletas no link. O e-mail é necessário para convites. Por favor, use o link original.');
+      setIsFormActive(false);
     }
   }, [isOnCorrectPath]); // Dependência apenas em isOnCorrectPath para rodar na montagem e se o path mudar
 
@@ -155,14 +173,25 @@ export default function FirstAccessPasswordForm() {
         return;
       }
       
-      const otpParams = {
+      // Construir otpParams dinamicamente
+      let otpParams: { token: string; type: 'recovery' | 'invite'; email?: string } = {
         token: accessToken!, 
-        type: tokenType as 'recovery' | 'invite', // Usar o tokenType validado
+        type: tokenType as 'recovery' | 'invite',
       };
+
+      if (tokenType === 'invite') {
+        if (!emailFromQuery) {
+          console.error('[DebugForm] Tentando verificar OTP do tipo "invite" sem e-mail.');
+          setError('E-mail não encontrado para verificação do convite. O link pode estar incompleto.');
+          setLoading(false);
+          return;
+        }
+        otpParams.email = emailFromQuery;
+      }
       
       console.log(`[DebugForm] Attempting to verify OTP with params:`, otpParams);
       
-      // Usar verifyOtp para consumir o token de recuperação e estabelecer a sessão
+      // Usar verifyOtp para consumir o token e estabelecer a sessão
       // @ts-ignore -- Mantendo temporariamente SE o usuário confirmar que o erro de tipo persiste após limpeza
       const { data, error: otpError } = await supabase.auth.verifyOtp(otpParams);
 
