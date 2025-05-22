@@ -191,6 +191,9 @@ export default function FirstAccessPasswordForm() {
       
       console.log(`[DebugForm] Attempting to verify OTP with params:`, otpParams);
       
+      // Adicionando log para inspecionar otpParams antes da chamada
+      console.log('[DebugForm] otpParams before verifyOtp:', otpParams);
+
       // Usar verifyOtp para consumir o token e estabelecer a sessão
       // @ts-ignore -- Mantendo temporariamente SE o usuário confirmar que o erro de tipo persiste após limpeza
       const { data, error: otpError } = await supabase.auth.verifyOtp(otpParams);
