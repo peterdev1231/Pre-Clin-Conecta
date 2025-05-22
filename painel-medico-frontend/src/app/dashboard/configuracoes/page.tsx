@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { UserCircle2, Edit3, ShieldCheck, Camera, Mail, User, Loader2, Save, X, Eye, EyeOff } from 'lucide-react';
+import { UserCircle2, Edit3, ShieldCheck, Camera, Mail, User, Loader2, Save, X, Eye, EyeOff, Package, CreditCard } from 'lucide-react';
 import Image from 'next/image';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 
 interface UserMetadata {
   full_name?: string;
@@ -17,6 +18,7 @@ interface UserMetadata {
 
 export default function ConfiguracoesPage() {
   const { user, supabase, refreshUser } = useAuth();
+  const { subscription, loading: loadingSubscription, error: subscriptionError } = useSubscriptionStatus();
   
   // Profile Info State
   const [fullName, setFullName] = useState('');
@@ -359,6 +361,99 @@ export default function ConfiguracoesPage() {
           </form>
         </div>
       </section>
+
+      {/* Subscription Status Card */}
+      <section aria-labelledby="subscription-info-heading" className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+        <div className="p-7 sm:p-9">
+          <div className="flex items-center justify-between">
+            <h2 id="subscription-info-heading" className="text-xl font-semibold text-[#25392C] dark:text-slate-200 flex items-center">
+              <CreditCard className="w-7 h-7 mr-3 text-[#00A651]" />
+              Status da Assinatura
+            </h2>
+          </div>
+
+          <div className="mt-6 text-slate-700 dark:text-slate-300 space-y-4">
+            {loadingSubscription && <p>Carregando status da assinatura...</p>}
+            {subscriptionError && <p className="text-red-500">Erro ao carregar status da assinatura: {subscriptionError}</p>}
+            {subscription && (
+              <>
+                <p className="text-base">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Plano Atual:</span>{' '}
+                  <span className="font-semibold text-[#25392C] dark:text-slate-100 capitalize">{subscription.tipo_plano.replace('_', ' ')}</span>
+                </p>
+                
+                <p className="text-base flex items-center">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Status:</span>{' '}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-semibold ${subscription.status_assinatura === 'ativo' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : subscription.status_assinatura === 'trial' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'}`}>
+                     <svg className={`-ml-0.5 mr-1.5 h-2 w-2 ${subscription.status_assinatura === 'ativo' ? 'text-green-500 dark:text-green-300' : subscription.status_assinatura === 'trial' ? 'text-blue-500 dark:text-blue-300' : 'text-red-500 dark:text-red-300'}`} fill="currentColor" viewBox="0 0 8 8">
+                      <circle cx={4} cy={4} r={3} />
+                    </svg>
+                    {subscription.status_assinatura}
+                  </span>
+                </p>
+                
+                {subscription.status_assinatura === 'trial' && subscription.data_expiracao_acesso && (
+                  <p className="text-base">
+                     <span className="font-medium text-slate-700 dark:text-slate-300">Dias restantes no Trial:</span>{' '}
+                    <span className="font-semibold text-[#25392C] dark:text-slate-100">{Math.max(0, Math.ceil((new Date(subscription.data_expiracao_acesso).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} dias</span>
+                  </p>
+                )}
+
+                {subscription.status_assinatura === 'ativo' && subscription.data_expiracao_acesso && (
+                   <p className="text-base">
+                     <span className="font-medium text-slate-700 dark:text-slate-300">Próxima cobrança em:</span>{' '}
+                     <span className="font-semibold text-[#25392C] dark:text-slate-100">{new Date(subscription.data_expiracao_acesso).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                   </p>
+                )}
+
+                {subscription.status_assinatura === 'trial' && (
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Seu período de teste gratuito está ativo. Aproveite para explorar todas as funcionalidades!</p>
+                 )}
+                 {subscription.status_assinatura === 'ativo' && (
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Sua assinatura está ativa e pronta para uso.</p>
+                 )}
+                 {subscription.status_assinatura !== 'trial' && subscription.status_assinatura !== 'ativo' && (
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">Sua assinatura não está ativa. Algumas funcionalidades podem estar limitadas.</p>
+                 )}
+              </>
+            )}
+             {!loadingSubscription && !subscription && !subscriptionError && (
+               <p className="text-orange-500">Dados de assinatura não encontrados. Entre em contato com o suporte.</p>
+             )}
+          </div>
+        </div>
+      </section>
+
+      {/* Support Contact Card */}
+      <section aria-labelledby="support-heading" className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+        <div className="p-7 sm:p-9">
+          <div className="flex items-center justify-between">
+            <h2 id="support-heading" className="text-xl font-semibold text-[#25392C] dark:text-slate-200 flex items-center">
+              {/* Using Mail icon for support */}
+              <Mail className="w-7 h-7 mr-3 text-[#00A651]" />
+              Suporte
+            </h2>
+          </div>
+
+          <div className="mt-6 text-slate-700 dark:text-slate-300 space-y-3">
+            <p className="text-base">
+              <span className="font-medium">Precisa de ajuda? Entre em contato conosco:</span>
+            </p>
+            <p className="text-base flex items-center">
+               <a href="mailto:contato@preclinconecta.com" className="text-[#00A651] hover:underline dark:text-[#00A651]">contato@preclinconecta.com</a>
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Nossa equipe de suporte está pronta para ajudar com quaisquer dúvidas ou problemas que você possa ter.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Delete Account Card - Assuming this exists or will exist */}
+      {/* <section aria-labelledby="delete-account-heading" className="bg-white dark:bg-slate-800 shadow-xl rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+// ... existing code ...
+      </section> */}
+
     </div>
   );
 } 
