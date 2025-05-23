@@ -270,7 +270,13 @@ export async function POST(req: NextRequest) {
         case 'PURCHASE_APPROVED':
             // Lógica de criação/atualização inicial da assinatura (já existente)
             const plano = mapearPlanoHotmart(payload.data?.subscription?.plan?.name, offerCode);
-            const statusAssinatura = mapearStatusHotmart(payload.data?.subscription?.status);
+            let statusAssinatura = mapearStatusHotmart(payload.data?.subscription?.status); // Usar let para permitir sobrescrever
+
+            // Sobrescrever status para 'trial' se o plano for anual_trial e for um evento de aprovação/início
+            if (plano === 'anual_trial' && eventoPrincipalUpper === 'PURCHASE_APPROVED') {
+                statusAssinatura = 'trial';
+            }
+
             const dataInicioAssinaturaObj = payload.data?.subscription?.start_date ? new Date(payload.data.subscription.start_date) : new Date();
             const dataInicioAssinaturaString = dataInicioAssinaturaObj.toISOString();
             const dataExpiracaoAssinatura = calcularDataExpiracao(dataInicioAssinaturaObj, plano);
@@ -328,7 +334,7 @@ export async function POST(req: NextRequest) {
              const assinaturaData = {
                  user_id: userId,
                  tipo_plano: plano,
-                 status_assinatura: statusAssinatura,
+                 status_assinatura: statusAssinatura, // Usar o status possivelmente sobrescrito
                  transaction_id_hotmart: transactionId, // transactionId da compra inicial
                  hotmart_id: offerCode, // Usar o código da oferta aqui (e3nl8u6h ou errb81gg)
                  data_inicio: dataInicioAssinaturaString, // Usar a string ISO para o BD
@@ -387,7 +393,7 @@ export async function POST(req: NextRequest) {
                  nome_completo: nomeComprador || emailComprador.split('@')[0],
                  plano_hotmart_id: payload.data?.subscription?.plan?.id?.toString() || payload.data?.product?.id?.toString() || 'N/A',
                  tipo_plano: plano,
-                 status_assinatura: statusAssinatura,
+                 status_assinatura: statusAssinatura, // Usar o status possivelmente sobrescrito
                  data_inicio_assinatura: dataInicioAssinaturaString,
                  data_expiracao_acesso: dataExpiracaoAssinatura,
                  hotmart_transaction_id: transactionId || 'N/A',
