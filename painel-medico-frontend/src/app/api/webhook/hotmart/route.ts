@@ -11,16 +11,22 @@ import { createClient } from '@supabase/supabase-js';
 function mapearPlanoHotmart(nomePlanoHotmart?: string): string {
   if (!nomePlanoHotmart) return 'desconhecido'; // Valor padrão ou tratamento de erro
   const nomeLower = nomePlanoHotmart.toLowerCase();
-  if (nomeLower.includes('anual') && nomeLower.includes('trial')) {
+  
+  // Primeiro verifica o trial anual (mais específico)
+  if (nomeLower.includes('anual') && (nomeLower.includes('trial') || nomeLower.includes('teste'))) { // Verifica por 'trial' ou 'teste'
     return 'anual_trial';
   }
+
+  // Depois verifica o anual pago (menos específico)
   if (nomeLower.includes('anual')) {
-    // Assumindo que se não é trial e é anual, é pago. Ajuste conforme necessário.
     return 'anual_pago';
   }
+
+  // Verifica o mensal
   if (nomeLower.includes('mensal')) {
     return 'mensal';
   }
+
   return 'desconhecido'; // Fallback
 }
 
