@@ -185,67 +185,72 @@ export async function POST(req: NextRequest) {
     // Vou manter a lógica de criação/busca de usuário aqui por enquanto, mas idealmente otimizaria para buscar o usuário existente para eventos pós-compra.
     
     // Tenta encontrar o usuário existente pelo email primeiro para qualquer evento.
-    const { data: { users: existingUsers }, error: fetchUserError } = await supabaseAdmin.auth.admin.listUsers({ email: emailComprador });
+    // Usando listUsers e filtrando localmente, pois a busca direta por email pode não ser suportada.
+    const { data: { users }, error: fetchUserError } = await supabaseAdmin.auth.admin.listUsers(); // Remover filtro de email aqui
 
     if (fetchUserError) {
-        console.error('[Hotmart Webhook] Erro ao buscar usuário existente:', fetchUserError.message);
+        console.error('[Hotmart Webhook] Erro ao buscar lista de usuários:', fetchUserError.message);
         // Dependendo da criticidade, pode retornar um erro 500 aqui
-    } else if (existingUsers && existingUsers.length > 0) {
-        userId = existingUsers[0].id;
-        console.log(`[Hotmart Webhook] Usuário existente ${emailComprador} encontrado com ID: ${userId}.`);
-    } else if (eventoPrincipalUpper === 'PURCHASE_APPROVED') {
-        // Se não encontrou e o evento é PURCHASE_APPROVED, tenta criar o usuário.
-         console.log(`[Hotmart Webhook] Usuário ${emailComprador} não encontrado, tentando criar...`);
-        const generatedPassword = generateRandomPassword(); // Gere senha apenas se for criar
-        const { data: createUserData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-            email: emailComprador,
-            password: generatedPassword,
-            email_confirm: true,
-            user_metadata: { 
-                nome_completo: nomeComprador
-            }
-        });
-
-        if (createUserError) {
-             console.error('[Hotmart Webhook] Erro ao criar usuário no Supabase Auth:', createUserError.message);
-             // Tratar caso de usuário já registrado aqui ou retornar erro.
-             // Se for user already registered, a busca inicial já deveria ter encontrado.
-             // Para outros erros de criação, provavelmente deve retornar erro 500.
-             return NextResponse.json({ error: `Falha ao criar usuário: ${(createUserError as any).error_description || createUserError.message}` }, { status: 500 });
-        } else if (createUserData && createUserData.user) {
-            userId = createUserData.user.id;
-            console.log(`[Hotmart Webhook] Usuário criado com sucesso para ${emailComprador}. ID: ${userId}.`);
-            // Chamar a Edge Function para enviar o email APENAS se um NOVO usuário foi criado
-             try {
-                const supabaseUrlBase = process.env.NEXT_PUBLIC_SUPABASE_URL;
-                 if (supabaseUrlBase) {
-                    const emailFunctionUrl = `${supabaseUrlBase}/functions/v1/${emailFunctionName}`;
-                     console.log(`[Hotmart Webhook] Chamando Edge Function ${emailFunctionName} (${emailFunctionUrl})...`);
-
-                    const emailResponse = await fetch(emailFunctionUrl, {
-                         method: 'POST',
-                         headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` 
-                        },
-                         body: JSON.stringify({
-                            emailDestinatario: emailComprador,
-                            nomeDestinatario: nomeComprador,
-                            senhaGerada: generatedPassword 
-                        }),
-                    });
-
-                     if (!emailResponse.ok) {
-                        const emailErrorBody = await emailResponse.text();
-                         console.error(`[Hotmart Webhook] Erro ao chamar Edge Function ${emailFunctionName}: Status ${emailResponse.status}. Corpo: ${emailErrorBody}`);
-                    } else {
-                         console.log(`[Hotmart Webhook] Edge Function ${emailFunctionName} chamada com sucesso.`);
-                    }
-                } else {
-                     console.error('[Hotmart Webhook] Variável de ambiente NEXT_PUBLIC_SUPABASE_URL não configurada para chamar Edge Function.');
+    } else if (users && users.length > 0) {
+        // Filtrar a lista de usuários pelo email
+        const existingUser = users.find(user => user.email === emailComprador);
+        if (existingUser) {
+             userId = existingUser.id;
+            console.log(`[Hotmart Webhook] Usuário existente ${emailComprador} encontrado com ID: ${userId}.`);
+        } else if (eventoPrincipalUpper === 'PURCHASE_APPROVED') {
+             // Se não encontrou na lista e o evento é PURCHASE_APPROVED, tenta criar o usuário.
+             console.log(`[Hotmart Webhook] Usuário ${emailComprador} não encontrado na lista, tentando criar...`);
+            const generatedPassword = generateRandomPassword(); // Gere senha apenas se for criar
+            const { data: createUserData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
+                email: emailComprador,
+                password: generatedPassword,
+                email_confirm: true,
+                user_metadata: { 
+                    nome_completo: nomeComprador
                 }
-            } catch (emailCallError) {
-                 console.error(`[Hotmart Webhook] Erro inesperado ao chamar Edge Function ${emailFunctionName}:`, emailCallError);
+            });
+
+            if (createUserError) {
+                 console.error('[Hotmart Webhook] Erro ao criar usuário no Supabase Auth:', createUserError.message);
+                 // Tratar caso de usuário já registrado aqui ou retornar erro.
+                 // Se for user already registered, a busca inicial já deveria ter encontrado.
+                 // Para outros erros de criação, provavelmente deve retornar erro 500.
+                 return NextResponse.json({ error: `Falha ao criar usuário: ${(createUserError as any).error_description || createUserError.message}` }, { status: 500 });
+            } else if (createUserData && createUserData.user) {
+                userId = createUserData.user.id;
+                console.log(`[Hotmart Webhook] Usuário criado com sucesso para ${emailComprador}. ID: ${userId}.`);
+                // Chamar a Edge Function para enviar o email APENAS se um NOVO usuário foi criado
+                 try {
+                    const supabaseUrlBase = process.env.NEXT_PUBLIC_SUPABASE_URL;
+                     if (supabaseUrlBase) {
+                        const emailFunctionUrl = `${supabaseUrlBase}/functions/v1/${emailFunctionName}`;
+                         console.log(`[Hotmart Webhook] Chamando Edge Function ${emailFunctionName} (${emailFunctionUrl})...`);
+
+                        const emailResponse = await fetch(emailFunctionUrl, {
+                             method: 'POST',
+                             headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` 
+                            },
+                             body: JSON.stringify({
+                                emailDestinatario: emailComprador,
+                                nomeDestinatario: nomeComprador,
+                                senhaGerada: generatedPassword 
+                            }),
+                        });
+
+                         if (!emailResponse.ok) {
+                            const emailErrorBody = await emailResponse.text();
+                             console.error(`[Hotmart Webhook] Erro ao chamar Edge Function ${emailFunctionName}: Status ${emailResponse.status}. Corpo: ${emailErrorBody}`);
+                        } else {
+                             console.log(`[Hotmart Webhook] Edge Function ${emailFunctionName} chamada com sucesso.`);
+                        }
+                    } else {
+                         console.error('[Hotmart Webhook] Variável de ambiente NEXT_PUBLIC_SUPABASE_URL não configurada para chamar Edge Function.');
+                    }
+                } catch (emailCallError) {
+                     console.error(`[Hotmart Webhook] Erro inesperado ao chamar Edge Function ${emailFunctionName}:`, emailCallError);
+                }
             }
         }
     }
